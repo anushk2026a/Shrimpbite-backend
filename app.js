@@ -6,7 +6,6 @@ import adminRoutes from "./routes/adminRoutes.js"
 import uploadRoutes from "./routes/uploadRoutes.js"
 import appAuthRoutes from "./routes/appAuthRoutes.js";
 
-app.use("/api/app", appAuthRoutes);
 const app = express()
 
 // Connect Database
@@ -23,6 +22,9 @@ app.use("/api/auth", authRoutes)
 app.use("/api/admin", adminRoutes)
 app.use("/api/upload", uploadRoutes)
 
+//app routes
+
+app.use("/api/app", appAuthRoutes);
 // Basic test route
 app.get("/", (req, res) => {
     res.send("Shrimpbite Backend Running 🦐")
