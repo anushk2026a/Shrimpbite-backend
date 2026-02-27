@@ -1,20 +1,29 @@
 import mongoose from "mongoose"
 
-let isConnected = false
+let cachedPromise = null
 
 const connectDB = async () => {
-    if (isConnected) {
-        return
+    if (mongoose.connection.readyState >= 1) {
+        return mongoose.connection
     }
 
-    try {
-        const db = await mongoose.connect(process.env.MONGO_URI)
-        isConnected = db.connections[0].readyState === 1
-        console.log("MongoDB Connected 🚀")
-    } catch (err) {
-        console.error("Database Connection Failed ❌", err.message)
-        // In serverless, we don't necessarily want to process.exit(1) as it might kill the lambda unfairly
+    if (!cachedPromise) {
+        const opts = {
+            bufferCommands: false,
+        }
+
+        console.log("Connecting to MongoDB... ⏳")
+        cachedPromise = mongoose.connect(process.env.MONGO_URI, opts).then((mongoose) => {
+            console.log("MongoDB Connected 🚀")
+            return mongoose
+        }).catch((err) => {
+            cachedPromise = null
+            console.error("Database Connection Failed ❌", err.message)
+            throw err
+        })
     }
+
+    return cachedPromise
 }
 
 export default connectDB
