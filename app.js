@@ -16,24 +16,14 @@ app.use(cors())
 app.use(express.json())
 app.use("/uploads", express.static(path.join(process.cwd(), "uploads")))
 
-// Basic test route
-app.get("/", (req, res) => {
-    res.send("Shrimpbite Backend Running 🦐")
-})
-
-// Database Connection Guard Middleware
-app.use(async (req, res, next) => {
-    try {
-        await connectDB()
-        next()
-    } catch (err) {
-        res.status(500).json({ message: "Database connection failed", error: err.message })
-    }
-})
-
 // Routes
 app.use("/api/auth", authRoutes)
 app.use("/api/admin", adminRoutes)
 app.use("/api/upload", uploadRoutes)
+
+// Basic test route
+app.get("/", (req, res) => {
+    res.send("Shrimpbite Backend Running 🦐")
+})
 
 export default app
