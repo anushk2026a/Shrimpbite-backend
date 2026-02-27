@@ -28,7 +28,7 @@ router.post("/register", async (req, res) => {
 
         const token = jwt.sign({ id: newUser._id, role: "retailer" }, process.env.JWT_SECRET, { expiresIn: "1d" })
 
-        res.status(201).json({ token, user: { id: newUser._id, name, email, status: newUser.status, role: "retailer" } })
+        res.status(201).json({ token, user: { _id: newUser._id, name, email, status: newUser.status, role: "retailer" } })
     } catch (error) {
         console.error(error)
         res.status(500).json({ message: error.message || "Something went wrong" })
@@ -59,7 +59,16 @@ router.post("/login", async (req, res) => {
 
         const token = jwt.sign({ id: user._id, role: user.role }, process.env.JWT_SECRET, { expiresIn: "1d" })
 
-        res.status(200).json({ token, user: { id: user._id, name: user.name, email, status: user.status } })
+        res.status(200).json({
+            token,
+            user: {
+                _id: user._id,
+                name: user.name,
+                email,
+                status: user.status,
+                role: user.role
+            }
+        })
     } catch (error) {
         console.error(error)
         res.status(500).json({ message: "Something went wrong" })
