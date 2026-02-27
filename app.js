@@ -7,6 +7,10 @@ import uploadRoutes from "./routes/uploadRoutes.js"
 
 const app = express()
 
+// Connect Database
+import connectDB from "./config/db.js"
+connectDB()
+
 // Middleware
 app.use(cors())
 app.use(express.json())
