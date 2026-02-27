@@ -13,7 +13,7 @@ const connectDB = async () => {
         console.log("MongoDB Connected 🚀")
     } catch (err) {
         console.error("Database Connection Failed ❌", err.message)
-        // In serverless, we don't necessarily want to process.exit(1) as it might kill the lambda unfairly
+
     }
 }
 

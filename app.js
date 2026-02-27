@@ -4,7 +4,9 @@ import path from "path"
 import authRoutes from "./routes/authRoutes.js"
 import adminRoutes from "./routes/adminRoutes.js"
 import uploadRoutes from "./routes/uploadRoutes.js"
+import appAuthRoutes from "./routes/appAuthRoutes.js";
 
+app.use("/api/app", appAuthRoutes);
 const app = express()
 
 // Connect Database
