@@ -120,23 +120,114 @@ router.put("/profile", protectAppUser, async (req, res) => {
     try {
         const { fullName, username, email, phoneNumber } = req.body;
 
+        if (!fullName && !username && !email && !phoneNumber) {
+            return res.status(400).json({
+                success: false,
+                message: "At least one field is required to update",
+            });
+        }
+
         const user = await AppUser.findById(req.user._id);
 
-        if (!user) return res.status(404).json({ message: "User not found" });
+        if (!user) {
+            return res.status(404).json({
+                success: false,
+                message: "User not found",
+            });
+        }
 
-        user.fullName = fullName || user.fullName;
-        user.username = username || user.username;
-        user.email = email || user.email;
-        user.phoneNumber = phoneNumber || user.phoneNumber;
+        let updates = [];
+
+        // Full Name
+        if (fullName) {
+            if (fullName === user.fullName) {
+                return res.status(400).json({
+                    success: false,
+                    message: "Full name is same as previous",
+                });
+            }
+            user.fullName = fullName;
+            updates.push("fullName");
+        }
+
+        // Email
+        if (email) {
+            if (email === user.email) {
+                return res.status(400).json({
+                    success: false,
+                    message: "Email is same as previous",
+                });
+            }
+
+            const emailExists = await AppUser.findOne({ email });
+            if (emailExists) {
+                return res.status(400).json({
+                    success: false,
+                    message: "Email already in use",
+                });
+            }
+
+            user.email = email;
+            updates.push("email");
+        }
+
+        // Username
+        if (username) {
+            if (username === user.username) {
+                return res.status(400).json({
+                    success: false,
+                    message: "Username is same as previous",
+                });
+            }
+
+            const usernameExists = await AppUser.findOne({ username });
+            if (usernameExists) {
+                return res.status(400).json({
+                    success: false,
+                    message: "Username already in use",
+                });
+            }
+
+            user.username = username;
+            updates.push("username");
+        }
+
+        // Phone Number
+        if (phoneNumber) {
+            if (phoneNumber === user.phoneNumber) {
+                return res.status(400).json({
+                    success: false,
+                    message: "Phone number is same as previous",
+                });
+            }
+
+            const phoneExists = await AppUser.findOne({ phoneNumber });
+            if (phoneExists) {
+                return res.status(400).json({
+                    success: false,
+                    message: "Phone number already in use",
+                });
+            }
+
+            user.phoneNumber = phoneNumber;
+            updates.push("phoneNumber");
+        }
 
         await user.save();
 
         res.status(200).json({
-            message: "Profile updated",
-            user,
+            success: true,
+            message: `Profile updated successfully`,
+            updatedFields: updates,
+            data: user,
         });
+
     } catch (err) {
-        res.status(500).json({ message: "Server error" });
+        console.error(err);
+        res.status(500).json({
+            success: false,
+            message: "Something went wrong while updating profile",
+        });
     }
 });
 //change password
