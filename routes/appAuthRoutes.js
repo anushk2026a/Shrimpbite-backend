@@ -10,11 +10,11 @@ router.post("/register", async (req, res) => {
         const { fullName, username, email, phoneNumber, password, confirmPassword } = req.body;
 
         if (!fullName || !phoneNumber || !password || !confirmPassword) {
-            return res.status(400).json({ message: "All required fields must be filled" });
+            return res.status(400).json({ success: false, message: "All required fields must be filled" });
         }
 
         if (password !== confirmPassword) {
-            return res.status(400).json({ message: "Passwords do not match" });
+            return res.status(400).json({ success: false, message: "Passwords do not match" });
         }
 
         const existingUser = await AppUser.findOne({
@@ -22,7 +22,7 @@ router.post("/register", async (req, res) => {
         });
 
         if (existingUser) {
-            return res.status(400).json({ message: "User already exists" });
+            return res.status(400).json({ success: false, message: "User already exists" });
         }
 
         const hashedPassword = await bcrypt.hash(password, 10);
@@ -42,9 +42,10 @@ router.post("/register", async (req, res) => {
         );
 
         res.status(201).json({
+            success: true,
             message: "User registered successfully",
             token,
-            user: {
+            data: {
                 id: newUser._id,
                 fullName: newUser.fullName,
                 email: newUser.email,
@@ -53,7 +54,7 @@ router.post("/register", async (req, res) => {
             },
         });
     } catch (error) {
-        res.status(500).json({ message: "Server error", error: error.message });
+        res.status(500).json({ success: false, message: "Server error", error: error.message });
     }
 });
 
@@ -63,7 +64,7 @@ router.post("/login", async (req, res) => {
         // identifier = email OR username
 
         if (!identifier || !password) {
-            return res.status(400).json({ message: "All fields required" });
+            return res.status(400).json({ success: false, message: "All fields required" });
         }
 
         const user = await AppUser.findOne({
@@ -71,13 +72,13 @@ router.post("/login", async (req, res) => {
         });
 
         if (!user) {
-            return res.status(400).json({ message: "Invalid credentials" });
+            return res.status(400).json({ success: false, message: "Invalid credentials" });
         }
 
         const isMatch = await bcrypt.compare(password, user.password);
 
         if (!isMatch) {
-            return res.status(400).json({ message: "Invalid credentials" });
+            return res.status(400).json({ success: false, message: "Invalid credentials" });
         }
 
         const token = jwt.sign(
@@ -87,9 +88,10 @@ router.post("/login", async (req, res) => {
         );
 
         res.status(200).json({
+            success: true,
             message: "Login successful",
             token,
-            user: {
+            data: {
                 id: user._id,
                 fullName: user.fullName,
                 email: user.email,
@@ -98,7 +100,7 @@ router.post("/login", async (req, res) => {
             },
         });
     } catch (error) {
-        res.status(500).json({ message: "Server error" });
+        res.status(500).json({ success: false, message: "Server error" });
     }
 });
 
