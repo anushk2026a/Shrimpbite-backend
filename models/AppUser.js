@@ -26,6 +26,16 @@ const appUserSchema = new mongoose.Schema(
             type: String,
             required: true,
         },
+        addresses: [
+            {
+                label: String, // Home / Work
+                fullAddress: String,
+                city: String,
+                state: String,
+                pincode: String,
+                isDefault: { type: Boolean, default: false }
+            }
+        ],
     },
     { timestamps: true }
 );
