@@ -1,305 +1,46 @@
 import express from "express";
-import bcrypt from "bcryptjs";
-import jwt from "jsonwebtoken";
-import AppUser from "../models/AppUser.js";
 import protectAppUser from "../middleware/appAuthMiddleware.js";
+
 const router = express.Router();
+
+import {
+    registerUser,
+    loginUser,
+    getProfile,
+    updateProfile,
+    changePassword,
+    forgotPassword,
+    addAddress,
+    getAddresses,
+    deleteAddress
+} from "../controllers/appAuthController.js";
 
 //register
 
-router.post("/register", async (req, res) => {
-    try {
-        const { fullName, username, email, phoneNumber, password, confirmPassword } = req.body;
-
-        if (!fullName || !phoneNumber || !password || !confirmPassword) {
-            return res.status(400).json({ success: false, message: "All required fields must be filled" });
-        }
-
-        if (password !== confirmPassword) {
-            return res.status(400).json({ success: false, message: "Passwords do not match" });
-        }
-
-        const existingUser = await AppUser.findOne({
-            $or: [{ email }, { username }, { phoneNumber }],
-        });
-
-        if (existingUser) {
-            return res.status(400).json({ success: false, message: "User already exists" });
-        }
-
-        const hashedPassword = await bcrypt.hash(password, 10);
-
-        const newUser = await AppUser.create({
-            fullName,
-            username,
-            email,
-            phoneNumber,
-            password: hashedPassword,
-        });
-
-        const token = jwt.sign(
-            { id: newUser._id },
-            process.env.JWT_SECRET,
-            { expiresIn: "7d" }
-        );
-
-        res.status(201).json({
-            success: true,
-            message: "User registered successfully",
-            token,
-            data: {
-                id: newUser._id,
-                fullName: newUser.fullName,
-                email: newUser.email,
-                username: newUser.username,
-                phoneNumber: newUser.phoneNumber,
-            },
-        });
-    } catch (error) {
-        res.status(500).json({ success: false, message: "Server error", error: error.message });
-    }
-});
+router.post("/register", registerUser);
 
 //login
-router.post("/login", async (req, res) => {
-    try {
-        const { identifier, password } = req.body;
-        // identifier = email OR username
-
-        if (!identifier || !password) {
-            return res.status(400).json({ success: false, message: "All fields required" });
-        }
-
-        const user = await AppUser.findOne({
-            $or: [{ email: identifier }, { username: identifier }],
-        });
-
-        if (!user) {
-            return res.status(400).json({ success: false, message: "Invalid credentials" });
-        }
-
-        const isMatch = await bcrypt.compare(password, user.password);
-
-        if (!isMatch) {
-            return res.status(400).json({ success: false, message: "Invalid credentials" });
-        }
-
-        const token = jwt.sign(
-            { id: user._id },
-            process.env.JWT_SECRET,
-            { expiresIn: "7d" }
-        );
-
-        res.status(200).json({
-            success: true,
-            message: "Login successful",
-            token,
-            data: {
-                id: user._id,
-                fullName: user.fullName,
-                email: user.email,
-                username: user.username,
-                phoneNumber: user.phoneNumber,
-            },
-        });
-    } catch (error) {
-        res.status(500).json({ success: false, message: "Server error" });
-    }
-});
+router.post("/login", loginUser);
 
 //get profile
-router.get("/profile", protectAppUser, async (req, res) => {
-    res.status(200).json({
-        success: true,
-        data: req.user
-    });
-});
+router.get("/profile", protectAppUser, getProfile);
 
 //update profile
-router.put("/profile", protectAppUser, async (req, res) => {
-    try {
-        const { fullName, username, email, phoneNumber } = req.body;
+router.put("/profile", protectAppUser, updateProfile);
 
-        if (!fullName && !username && !email && !phoneNumber) {
-            return res.status(400).json({
-                success: false,
-                message: "At least one field is required to update",
-            });
-        }
-
-        const user = await AppUser.findById(req.user._id);
-
-        if (!user) {
-            return res.status(404).json({
-                success: false,
-                message: "User not found",
-            });
-        }
-
-        let updates = [];
-
-        // Full Name
-        if (fullName) {
-            if (fullName === user.fullName) {
-                return res.status(400).json({
-                    success: false,
-                    message: "Full name is same as previous",
-                });
-            }
-            user.fullName = fullName;
-            updates.push("fullName");
-        }
-
-        // Email
-        if (email) {
-            if (email === user.email) {
-                return res.status(400).json({
-                    success: false,
-                    message: "Email is same as previous",
-                });
-            }
-
-            const emailExists = await AppUser.findOne({ email });
-            if (emailExists) {
-                return res.status(400).json({
-                    success: false,
-                    message: "Email already in use",
-                });
-            }
-
-            user.email = email;
-            updates.push("email");
-        }
-
-        // Username
-        if (username) {
-            if (username === user.username) {
-                return res.status(400).json({
-                    success: false,
-                    message: "Username is same as previous",
-                });
-            }
-
-            const usernameExists = await AppUser.findOne({ username });
-            if (usernameExists) {
-                return res.status(400).json({
-                    success: false,
-                    message: "Username already in use",
-                });
-            }
-
-            user.username = username;
-            updates.push("username");
-        }
-
-        // Phone Number
-        if (phoneNumber) {
-            if (phoneNumber === user.phoneNumber) {
-                return res.status(400).json({
-                    success: false,
-                    message: "Phone number is same as previous",
-                });
-            }
-
-            const phoneExists = await AppUser.findOne({ phoneNumber });
-            if (phoneExists) {
-                return res.status(400).json({
-                    success: false,
-                    message: "Phone number already in use",
-                });
-            }
-
-            user.phoneNumber = phoneNumber;
-            updates.push("phoneNumber");
-        }
-
-        await user.save();
-
-        res.status(200).json({
-            success: true,
-            message: `Profile updated successfully`,
-            updatedFields: updates,
-            data: user,
-        });
-
-    } catch (err) {
-        console.error(err);
-        res.status(500).json({
-            success: false,
-            message: "Something went wrong while updating profile",
-        });
-    }
-});
 //change password
-router.put("/change-password", protectAppUser, async (req, res) => {
-    try {
-        const { currentPassword, newPassword } = req.body;
+router.put("/change-password", protectAppUser, changePassword);
 
-        const user = await AppUser.findById(req.user._id);
-
-        const isMatch = await bcrypt.compare(currentPassword, user.password);
-
-        if (!isMatch) {
-            return res.status(400).json({ message: "Current password incorrect" });
-        }
-
-        user.password = await bcrypt.hash(newPassword, 10);
-        await user.save();
-
-        res.status(200).json({ message: "Password changed successfully" });
-    } catch (err) {
-        res.status(500).json({ message: "Server error" });
-    }
-});
 //forgot password
-router.post("/forgot-password", async (req, res) => {
-    const { email } = req.body;
+router.post("/forgot-password", forgotPassword);
 
-    const user = await AppUser.findOne({ email });
+//add address
+router.post("/addaddress", protectAppUser, addAddress);
 
-    if (!user) {
-        return res.status(404).json({ message: "User not found" });
-    }
+//get addresses
+router.get("/address", protectAppUser, getAddresses);
 
-    // Later: generate reset token + send email
+//delete address
+router.delete("/address/:id", protectAppUser, deleteAddress);
 
-    res.status(200).json({
-        message: "Password reset flow to be implemented",
-    });
-});
-
-// Add Address
-router.post("/address", protectAppUser, async (req, res) => {
-    const user = await AppUser.findById(req.user._id);
-
-    user.addresses.push(req.body);
-
-    await user.save();
-
-    res.status(201).json({
-        message: "Address added",
-        addresses: user.addresses,
-    });
-});
-// get address
-router.get("/address", protectAppUser, async (req, res) => {
-    const user = await AppUser.findById(req.user._id);
-
-    res.status(200).json(user.addresses);
-});
-// delete address
-router.delete("/address/:id", protectAppUser, async (req, res) => {
-    const user = await AppUser.findById(req.user._id);
-
-    user.addresses = user.addresses.filter(
-        (addr) => addr._id.toString() !== req.params.id
-    );
-
-    await user.save();
-
-    res.status(200).json({
-        message: "Address removed",
-        addresses: user.addresses,
-    });
-});
 export default router;
