@@ -2,6 +2,7 @@ import express from "express"
 import multer from "multer"
 import path from "path"
 import fs from "fs"
+import { uploadFile } from "../controllers/uploadController.js";
 
 const router = express.Router()
 
@@ -37,17 +38,6 @@ const upload = multer({
     }
 })
 
-router.post("/", upload.single("file"), (req, res) => {
-    try {
-        if (!req.file) {
-            return res.status(400).json({ message: "No file uploaded" })
-        }
-        const baseUrl = process.env.BASE_URL || `http://localhost:${process.env.PORT || 5000}`
-        const fileUrl = `${baseUrl}/uploads/${req.file.filename}`
-        res.status(200).json({ url: fileUrl, filename: req.file.originalname })
-    } catch (error) {
-        res.status(500).json({ message: error.message })
-    }
-})
+router.post("/", upload.single("file"), uploadFile)
 
 export default router
