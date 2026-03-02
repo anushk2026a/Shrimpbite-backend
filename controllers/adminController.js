@@ -1,4 +1,46 @@
 import User from "../models/User.js";
+import AppUser from "../models/AppUser.js";
+
+// Get all app users
+export const getAppUsers = async (req, res) => {
+    try {
+        const { page = 1, limit = 10, search = "" } = req.query;
+        const query = {};
+
+        if (search) {
+            query.$or = [
+                { fullName: { $regex: search, $options: "i" } },
+                { email: { $regex: search, $options: "i" } },
+                { phoneNumber: { $regex: search, $options: "i" } }
+            ];
+        }
+
+        const skip = (parseInt(page) - 1) * parseInt(limit);
+
+        const totalUsers = await AppUser.countDocuments(query);
+        const users = await AppUser.find(query)
+            .sort({ createdAt: -1 })
+            .skip(skip)
+            .limit(parseInt(limit));
+
+        res.status(200).json({
+            success: true,
+            data: users,
+            pagination: {
+                totalUsers,
+                totalPages: Math.ceil(totalUsers / limit),
+                currentPage: parseInt(page),
+                limit: parseInt(limit)
+            }
+        });
+
+    } catch (error) {
+        res.status(500).json({
+            success: false,
+            message: error.message,
+        });
+    }
+};
 
 // Get all retailers
 export const getRetailers = async (req, res) => {
