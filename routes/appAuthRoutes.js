@@ -12,8 +12,13 @@ import {
     forgotPassword,
     addAddress,
     getAddresses,
-    deleteAddress
+    getAddresses,
+    deleteAddress,
+    getAppCategories
 } from "../controllers/appAuthController.js";
+
+// Categories (Public for App)
+router.get("/categories", getAppCategories);
 
 //register
 
