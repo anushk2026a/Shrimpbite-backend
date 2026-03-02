@@ -3,16 +3,35 @@ import User from "../models/User.js";
 // Get all retailers
 export const getRetailers = async (req, res) => {
     try {
-        const { status } = req.query;
-
+        const { status, page = 1, limit = 10, search = "" } = req.query;
         const query = { role: "retailer" };
         if (status) query.status = status;
 
-        const retailers = await User.find(query).sort({ createdAt: -1 });
+        if (search) {
+            query.$or = [
+                { name: { $regex: search, $options: "i" } },
+                { email: { $regex: search, $options: "i" } },
+                { "businessDetails.businessName": { $regex: search, $options: "i" } }
+            ];
+        }
+
+        const skip = (parseInt(page) - 1) * parseInt(limit);
+
+        const totalRetailers = await User.countDocuments(query);
+        const retailers = await User.find(query)
+            .sort({ createdAt: -1 })
+            .skip(skip)
+            .limit(parseInt(limit));
 
         res.status(200).json({
             success: true,
             data: retailers,
+            pagination: {
+                totalRetailers,
+                totalPages: Math.ceil(totalRetailers / limit),
+                currentPage: parseInt(page),
+                limit: parseInt(limit)
+            }
         });
 
     } catch (error) {
