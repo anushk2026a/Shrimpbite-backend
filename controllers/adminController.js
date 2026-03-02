@@ -1,5 +1,88 @@
 import User from "../models/User.js";
 import AppUser from "../models/AppUser.js";
+import Category from "../models/Category.js";
+
+// --- CATEGORY CONTROLLERS ---
+
+// Get all categories with pagination and search
+export const getCategories = async (req, res) => {
+    try {
+        const { page = 1, limit = 10, search = "" } = req.query;
+        const query = {};
+
+        if (search) {
+            query.name = { $regex: search, $options: "i" };
+        }
+
+        const skip = (parseInt(page) - 1) * parseInt(limit);
+
+        const totalCategories = await Category.countDocuments(query);
+        const categories = await Category.find(query)
+            .sort({ name: 1 })
+            .skip(skip)
+            .limit(parseInt(limit));
+
+        res.status(200).json({
+            success: true,
+            data: categories,
+            pagination: {
+                totalCategories,
+                totalPages: Math.ceil(totalCategories / limit),
+                currentPage: parseInt(page),
+                limit: parseInt(limit)
+            }
+        });
+    } catch (error) {
+        res.status(500).json({ success: false, message: error.message });
+    }
+};
+
+// Create a new category
+export const createCategory = async (req, res) => {
+    try {
+        const { name } = req.body;
+        if (!name) return res.status(400).json({ success: false, message: "Name is required" });
+
+        const category = await Category.create({ name });
+        res.status(201).json({ success: true, data: category });
+    } catch (error) {
+        if (error.code === 11000) {
+            return res.status(400).json({ success: false, message: "Category already exists" });
+        }
+        res.status(500).json({ success: false, message: error.message });
+    }
+};
+
+// Update a category
+export const updateCategory = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { name } = req.body;
+
+        const category = await Category.findByIdAndUpdate(id, { name }, { new: true, runValidators: true });
+        if (!category) return res.status(404).json({ success: false, message: "Category not found" });
+
+        res.status(200).json({ success: true, data: category });
+    } catch (error) {
+        if (error.code === 11000) {
+            return res.status(400).json({ success: false, message: "Category already exists" });
+        }
+        res.status(500).json({ success: false, message: error.message });
+    }
+};
+
+// Delete a category
+export const deleteCategory = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const category = await Category.findByIdAndDelete(id);
+        if (!category) return res.status(404).json({ success: false, message: "Category not found" });
+
+        res.status(200).json({ success: true, message: "Category deleted successfully" });
+    } catch (error) {
+        res.status(500).json({ success: false, message: error.message });
+    }
+};
 
 // Get all app users
 export const getAppUsers = async (req, res) => {
