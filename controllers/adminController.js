@@ -206,3 +206,23 @@ export const updateRetailerStatus = async (req, res) => {
         });
     }
 };
+
+// --- APP PUBLIC API ---
+export const getPublicCategories = async (req, res) => {
+    try {
+        const categories = await Category.find().select("name image").sort({ name: 1 });
+
+        const minimalCategories = categories.map(cat => ({
+            id: cat._id,
+            name: cat.name,
+            image: cat.image || ""
+        }));
+
+        res.status(200).json({
+            success: true,
+            categories: minimalCategories
+        });
+    } catch (error) {
+        res.status(500).json({ success: false, message: error.message });
+    }
+};
