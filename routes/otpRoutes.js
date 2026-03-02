@@ -1,5 +1,9 @@
+import express from "express";
 import otpGenerator from "otp-generator";
 import AppUser from "../models/AppUser.js";
+import Otp from "../models/Otp.js";
+
+const router = express.Router();
 
 // send otp
 router.post("/send", async (req, res) => {
