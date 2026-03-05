@@ -8,6 +8,12 @@ import {
     updateCategory,
     deleteCategory
 } from "../controllers/adminController.js";
+import {
+    getSubscriptionPlans,
+    createSubscriptionPlan,
+    updateSubscriptionPlan,
+    deleteSubscriptionPlan
+} from "../controllers/subscriptionController.js";
 
 const router = express.Router()
 
@@ -25,6 +31,12 @@ router.delete("/categories/:id", deleteCategory)
 
 // Update retailer status (approve/reject/suspend)
 router.put("/retailers/status", updateRetailerStatus)
+
+// Subscription Management
+router.get("/subscriptions", getSubscriptionPlans)
+router.post("/subscriptions", createSubscriptionPlan)
+router.put("/subscriptions/:id", updateSubscriptionPlan)
+router.delete("/subscriptions/:id", deleteSubscriptionPlan)
 
 
 

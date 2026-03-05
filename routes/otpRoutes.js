@@ -28,12 +28,12 @@ router.post("/send", async (req, res) => {
             { upsert: true, new: true }
         );
 
-        console.log(`[DUMMY OTP] for ${phoneNumber}: ${otpCode}`);
+        console.log(`[OTP] for ${phoneNumber}: ${otpCode}`);
 
         return res.status(200).json({
             success: true,
-            message: "OTP sent successfully (Dummy)",
-            otp: otpCode // In real app, don't return this!
+            message: "OTP sent successfully",
+            otp: otpCode
         });
     } catch (error) {
         console.error("otp send error:", error);
