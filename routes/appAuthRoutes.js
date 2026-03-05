@@ -15,9 +15,13 @@ import {
     deleteAddress
 } from "../controllers/appAuthController.js";
 import { getPublicCategories } from "../controllers/adminController.js";
+import { getPublicSubscriptionPlans } from "../controllers/subscriptionController.js";
 
 // Categories (Public for App)
 router.get("/categories", getPublicCategories);
+
+// Subscription Plans (Public for App)
+router.get("/subscriptions", getPublicSubscriptionPlans);
 
 //register
 

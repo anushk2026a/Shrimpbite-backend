@@ -43,3 +43,13 @@ export const deleteSubscriptionPlan = async (req, res) => {
         res.status(500).json({ success: false, message: error.message });
     }
 };
+
+// Get public subscription plans (Active only)
+export const getPublicSubscriptionPlans = async (req, res) => {
+    try {
+        const plans = await SubscriptionPlan.find({ status: "Active" }).sort({ price: 1 });
+        res.status(200).json({ success: true, data: plans });
+    } catch (error) {
+        res.status(500).json({ success: false, message: error.message });
+    }
+};
