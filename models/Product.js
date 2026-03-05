@@ -12,15 +12,15 @@ const ProductSchema = new mongoose.Schema({
     },
     price: {
         type: Number,
-        required: true
+        default: 0
     },
     silverPrice: {
         type: Number,
-        required: true
+        default: 0
     },
     goldPrice: {
         type: Number,
-        required: true
+        default: 0
     },
     category: {
         type: mongoose.Schema.Types.ObjectId,
