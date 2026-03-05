@@ -1,3 +1,5 @@
+import express from "express";
+import Category from "../models/Category.js";
 import protectAppUser from "../middleware/appAuthMiddleware.js";
 import { protect, retailerOnly } from "../middleware/authMiddleware.js";
 import {
