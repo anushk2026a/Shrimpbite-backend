@@ -220,7 +220,7 @@ export const getPublicCategories = async (req, res) => {
 
         res.status(200).json({
             success: true,
-            categories: minimalCategories
+            data: minimalCategories
         });
     } catch (error) {
         res.status(500).json({ success: false, message: error.message });

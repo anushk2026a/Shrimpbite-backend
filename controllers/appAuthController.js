@@ -240,7 +240,7 @@ export const addAddress = async (req, res) => {
         user.addresses.push(address);
         await user.save();
 
-        return res.status(201).json({ success: true, message: "Address added", addresses: user.addresses });
+        return res.status(201).json({ success: true, message: "Address added", data: user.addresses });
     } catch (error) {
         console.error("addAddress error:", error);
         return res.status(500).json({ success: false, message: "Server error" });
@@ -276,7 +276,7 @@ export const deleteAddress = async (req, res) => {
 
         await user.save();
 
-        return res.status(200).json({ success: true, message: "Address removed", addresses: user.addresses });
+        return res.status(200).json({ success: true, message: "Address removed", data: user.addresses });
     } catch (error) {
         console.error("deleteAddress error:", error);
         return res.status(500).json({ success: false, message: "Server error" });
