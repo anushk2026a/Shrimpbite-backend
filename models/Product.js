@@ -12,7 +12,7 @@ const ProductSchema = new mongoose.Schema({
     },
     price: {
         type: Number,
-        default: 0
+        required: true
     },
     silverPrice: {
         type: Number,
