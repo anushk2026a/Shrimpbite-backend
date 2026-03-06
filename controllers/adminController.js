@@ -40,10 +40,10 @@ export const getCategories = async (req, res) => {
 // Create a new category
 export const createCategory = async (req, res) => {
     try {
-        const { name, image } = req.body;
+        const { name, image, price } = req.body;
         if (!name) return res.status(400).json({ success: false, message: "Name is required" });
 
-        const category = await Category.create({ name, image });
+        const category = await Category.create({ name, image, price });
         res.status(201).json({ success: true, data: category });
     } catch (error) {
         if (error.code === 11000) {
@@ -57,9 +57,9 @@ export const createCategory = async (req, res) => {
 export const updateCategory = async (req, res) => {
     try {
         const { id } = req.params;
-        const { name, image } = req.body;
+        const { name, image, price } = req.body;
 
-        const category = await Category.findByIdAndUpdate(id, { name, image }, { new: true, runValidators: true });
+        const category = await Category.findByIdAndUpdate(id, { name, image, price }, { new: true, runValidators: true });
         if (!category) return res.status(404).json({ success: false, message: "Category not found" });
 
         res.status(200).json({ success: true, data: category });
@@ -215,7 +215,8 @@ export const getPublicCategories = async (req, res) => {
         const minimalCategories = categories.map(cat => ({
             id: cat._id,
             name: cat.name,
-            image: cat.image || ""
+            image: cat.image || "",
+            price: cat.price || 0
         }));
 
         res.status(200).json({
