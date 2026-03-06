@@ -28,6 +28,7 @@ app.use("/api/otp", otpRoutes);
 //app routes
 
 app.use("/api/app", appAuthRoutes);
+
 // Basic test route
 app.get("/", (req, res) => {
     res.send("Shrimpbite Backend Running 🦐")
