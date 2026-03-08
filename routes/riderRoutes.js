@@ -6,7 +6,8 @@ import {
     addRider,
     getRetailerRiders,
     updateRiderStatusByRetailer,
-    respondToOrderAssignment
+    respondToOrderAssignment,
+    completeDelivery
 } from "../controllers/riderController.js";
 import { getOptimizedRouteForRider } from "../controllers/logisticsController.js";
 import { protect, riderOnly, retailerOnly } from "../middleware/authMiddleware.js";
@@ -18,6 +19,7 @@ router.get("/orders", protect, riderOnly, getRiderOrders);
 router.patch("/status", protect, riderOnly, updateDeliveryStatus);
 router.patch("/order-response", protect, riderOnly, respondToOrderAssignment);
 router.patch("/location", protect, riderOnly, updateRiderLocation);
+router.patch("/complete", protect, riderOnly, completeDelivery);
 router.get("/optimized-route", protect, riderOnly, getOptimizedRouteForRider);
 
 // Retailer Side

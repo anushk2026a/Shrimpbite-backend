@@ -15,6 +15,7 @@ import communicationRoutes from "./routes/communicationRoutes.js";
 import otpRoutes from "./routes/otpRoutes.js";
 import reviewRoutes from "./routes/reviewRoutes.js";
 import orderRoutes from "./routes/orderRoutes.js";
+import paymentRoutes from "./routes/paymentRoutes.js";
 
 const app = express()
 
@@ -41,6 +42,7 @@ app.use("/api/payout", payoutRoutes);
 app.use("/api/communication", communicationRoutes);
 app.use("/api/reviews", reviewRoutes);
 app.use("/api/app/orders", orderRoutes);
+app.use("/api/payment", paymentRoutes);
 
 // Basic test route
 app.get("/", (req, res) => {

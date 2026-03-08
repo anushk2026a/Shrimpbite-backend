@@ -36,19 +36,80 @@ export const updateDeliveryStatus = async (req, res) => {
 export const updateRiderLocation = async (req, res) => {
     try {
         const { lat, lng } = req.body;
-        await User.findByIdAndUpdate(req.user.id, {
+        const userId = req.user.id;
+
+        await User.findByIdAndUpdate(userId, {
             "location.coordinates": [lng, lat],
             isOnline: true
         });
 
-        // Emit location to active orders
-        const Order = (await import("../models/Order.js")).default;
-        const activeOrders = await Order.find({ rider: req.user.id, status: "Out for Delivery" });
+        // Broadcast to active orders
+        const activeOrders = await Order.find({
+            rider: userId,
+            status: { $in: ["Accepted", "Out for Delivery"] }
+        });
+
         activeOrders.forEach(order => {
-            emitOrderUpdate(order.orderId, "LocationUpdate", { lat, lng });
+            // Room is order_{orderId}
+            emitOrderUpdate(`order_${order.orderId}`, "RIDER_LOCATION_UPDATE", {
+                lat,
+                lng,
+                orderId: order.orderId
+            });
         });
 
         res.status(200).json({ success: true });
+    } catch (error) {
+        res.status(500).json({ success: false, message: error.message });
+    }
+};
+
+export const completeDelivery = async (req, res) => {
+    try {
+        const { orderId, itemWeights } = req.body; // itemWeights: [{ productId, weight }]
+        const riderId = req.user.id;
+
+        const order = await Order.findOne({ orderId, rider: riderId }).populate("items.product");
+        if (!order) return res.status(404).json({ success: false, message: "Order not found or not assigned to you" });
+
+        let totalRefund = 0;
+        const updatedItems = order.items.map(item => {
+            const weightInfo = itemWeights?.find(w => w.productId.toString() === item.product._id.toString());
+            if (weightInfo && weightInfo.weight < item.quantity) {
+                const diff = item.quantity - weightInfo.weight;
+                const refundAmount = diff * item.price;
+                totalRefund += refundAmount;
+                item.deliveredWeight = weightInfo.weight;
+            } else {
+                item.deliveredWeight = item.quantity;
+            }
+            return item;
+        });
+
+        order.items = updatedItems;
+        order.status = "Delivered";
+        order.deliveredAt = new Date();
+        order.paymentStatus = "Paid";
+        await order.save();
+
+        if (totalRefund > 0) {
+            await walletService.adjustBalance(
+                order.user,
+                "appUser",
+                totalRefund,
+                "Credit",
+                `Weight Variation Refund: Order #${orderId}`,
+                "Refund",
+                order._id
+            );
+        }
+
+        // Update Rider status to Online
+        await RiderModel.findOneAndUpdate({ user: riderId }, { status: "Online" });
+
+        emitOrderUpdate(`order_${orderId}`, "DELIVERED", { orderId, refund: totalRefund });
+
+        res.status(200).json({ success: true, message: "Order delivered successfully", refund: totalRefund });
     } catch (error) {
         res.status(500).json({ success: false, message: error.message });
     }

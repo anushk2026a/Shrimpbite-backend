@@ -1,6 +1,8 @@
 import Order from "../models/Order.js";
 import Cart from "../models/Cart.js";
 import Product from "../models/Product.js";
+import AppUser from "../models/AppUser.js";
+import * as walletService from "../services/walletService.js";
 
 export const placeOrder = async (req, res) => {
     try {
@@ -33,6 +35,20 @@ export const placeOrder = async (req, res) => {
                 price: item.price,
                 status: "Pending"
             });
+        }
+
+        // 2.1 Wallet Balance Check
+        if (paymentMethod === "Wallet") {
+            const user = await AppUser.findById(userId);
+            if (!user || user.walletBalance < totalAmount) {
+                return res.status(400).json({
+                    success: false,
+                    message: `Insufficient wallet balance. Total: ₹${totalAmount}, Current: ₹${user?.walletBalance || 0}`
+                });
+            }
+
+            // Deduct from wallet
+            await walletService.adjustBalance(userId, "appUser", totalAmount, "Debit", "Order Payment", "Order", null);
         }
 
         // 3. Generate Order ID

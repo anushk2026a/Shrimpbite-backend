@@ -1,4 +1,5 @@
 import * as walletService from "../services/walletService.js";
+import { verifyRazorpaySignature } from "../services/razorpayService.js";
 
 export const getBalance = async (req, res) => {
     try {
@@ -25,10 +26,19 @@ export const getTransactionHistory = async (req, res) => {
     }
 };
 
-// Top up is usually handled via Razorpay webhook or success callback
+
+// Top up is usually handled via Razorpay success callback
 export const topUpSuccess = async (req, res) => {
     try {
-        const { amount, razorpayOrderId } = req.body;
+        const { amount, razorpayOrderId, razorpayPaymentId, razorpaySignature } = req.body;
+
+        // Verify Signature
+        const isValid = verifyRazorpaySignature(razorpayOrderId, razorpayPaymentId, razorpaySignature);
+
+        if (!isValid) {
+            return res.status(400).json({ success: false, message: "Invalid payment signature" });
+        }
+
         const result = await walletService.adjustBalance(
             req.user.id,
             "appUser",

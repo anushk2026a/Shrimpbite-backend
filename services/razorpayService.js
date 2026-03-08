@@ -1,17 +1,24 @@
-// Razorpay Service Skeleton
-// In a real environment, you would use 'razorpay' npm package with your API keys.
+import Razorpay from "razorpay";
+import crypto from "crypto";
+import dotenv from "dotenv";
+
+dotenv.config();
+
+const razorpay = new Razorpay({
+    key_id: process.env.RAZORPAY_KEY_ID,
+    key_secret: process.env.RAZORPAY_KEY_SECRET,
+});
 
 export const createRazorpayOrder = async (amount, currency = "INR") => {
     try {
-        console.log(`Creating Razorpay Order: ${amount} ${currency}`);
-
-        // Mock response
-        return {
-            id: `order_${Math.random().toString(36).substring(7)}`,
-            amount: amount * 100, // Razorpay works in paise
+        const options = {
+            amount: Math.round(amount * 100), // amount in the smallest currency unit (paise)
             currency,
-            status: "created"
+            receipt: `receipt_${Date.now()}`,
         };
+
+        const order = await razorpay.orders.create(options);
+        return order;
     } catch (error) {
         console.error("Razorpay Order Error:", error);
         throw error;
@@ -19,7 +26,11 @@ export const createRazorpayOrder = async (amount, currency = "INR") => {
 };
 
 export const verifyRazorpaySignature = (orderId, paymentId, signature) => {
-    // In a real app, use crypto.createHmac to verify the signature
-    console.log(`Verifying Razorpay Signature for Order: ${orderId}`);
-    return true; // Mock verification
+    const text = orderId + "|" + paymentId;
+    const generated_signature = crypto
+        .createHmac("sha256", process.env.RAZORPAY_KEY_SECRET)
+        .update(text)
+        .digest("hex");
+
+    return generated_signature === signature;
 };
