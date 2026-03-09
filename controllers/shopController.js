@@ -419,9 +419,10 @@ export const getRetailerOrders = async (req, res) => {
     try {
         const retailerId = req.user._id;
 
-        // Fetch all orders containing items from this retailer and populate product info
+        // Fetch all orders containing items from this retailer and populate product and rider info
         const orders = await Order.find({ "items.retailer": retailerId })
             .populate("items.product", "name")
+            .populate("rider", "name")
             .sort({ createdAt: -1 });
 
         // Calculate Stats
@@ -461,7 +462,8 @@ export const getRetailerOrders = async (req, res) => {
                 date: new Date(order.createdAt).toLocaleDateString("en-GB").replace(/\//g, "-"), // DD-MM-YYYY
                 price: retailerOrderTotal.toFixed(2),
                 payment: order.paymentStatus, // 'Paid', 'Pending', etc.
-                status: status
+                status: status,
+                rider: order.rider // Include rider info
             });
         });
 
