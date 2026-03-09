@@ -35,9 +35,17 @@ export const getIO = () => {
 
 // Simplified emitters for common events
 export const emitOrderUpdate = (orderId, status, data) => {
-    io.to(orderId).emit("orderUpdate", { status, data });
+    if (io) {
+        io.to(orderId).emit("orderUpdate", { status, data });
+    } else {
+        console.log(`Socket not initialized. Skipping emit for order ${orderId}`);
+    }
 };
 
 export const emitChatUpdate = (chatId, message) => {
-    io.to(chatId).emit("newMessage", message);
+    if (io) {
+        io.to(chatId).emit("newMessage", message);
+    } else {
+        console.log(`Socket not initialized. Skipping emit for chat ${chatId}`);
+    }
 };
