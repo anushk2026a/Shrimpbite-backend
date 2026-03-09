@@ -58,14 +58,17 @@ export const getIO = () => {
 };
 
 // Simplified emitters for common events
-export const emitOrderUpdate = async (orderId, status, data, retailerId = null) => {
+export const emitOrderUpdate = async (orderId, status, data, retailerId = null, userId = null) => {
     const rooms = [`order_${orderId}`];
     if (retailerId) rooms.push(`retailer_${retailerId}`);
+    if (userId) rooms.push(`user_${userId}`);
+
+    const payload = { status, data, orderId };
 
     // 1. Try local emit
     if (io) {
         rooms.forEach(room => {
-            io.to(room).emit("orderUpdate", { status, data, orderId });
+            io.to(room).emit("orderUpdate", payload);
         });
     }
 
@@ -81,12 +84,42 @@ export const emitOrderUpdate = async (orderId, status, data, retailerId = null) 
                         secret: process.env.SOCKET_SECRET || "shrimpbite_socket_relay_secret_2026",
                         event: "orderUpdate",
                         room: room,
-                        data: { status, data, orderId }
+                        data: payload
                     })
                 });
             }
         } catch (error) {
             console.error("Relay emit failed:", error.message);
+        }
+    }
+};
+
+// Emit rider assignment to the user — triggers popup + sound in user app
+export const emitRiderAssigned = async (orderId, userId, riderInfo) => {
+    const room = `user_${userId}`;
+    const payload = { orderId, rider: riderInfo };
+
+    _log("Emitting riderAssigned", { data: { room, orderId } });
+
+    if (io) {
+        io.to(room).emit("riderAssigned", payload);
+    }
+
+    const relayUrl = process.env.SOCKET_RELAY_URL;
+    if (relayUrl) {
+        try {
+            await fetch(`${relayUrl}/emit`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    secret: process.env.SOCKET_SECRET || "shrimpbite_socket_relay_secret_2026",
+                    event: "riderAssigned",
+                    room: room,
+                    data: payload
+                })
+            });
+        } catch (error) {
+            console.error("Relay riderAssigned emit failed:", error.message);
         }
     }
 };
