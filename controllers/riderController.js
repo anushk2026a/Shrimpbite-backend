@@ -23,13 +23,14 @@ export const updateDeliveryStatus = async (req, res) => {
                 deliveredAt: status === "Delivered" ? new Date() : null,
                 $set: { "items.$[].status": status }
             },
-            { new: true }
-        );
+        ).populate("items.retailer");
 
         if (!order) return res.status(404).json({ success: false, message: "Order not found or not assigned to you" });
 
-        // Emit real-time update to user
-        emitOrderUpdate(orderId, status, { orderId, status });
+        const retailerId = order.items[0]?.retailer;
+
+        // Emit real-time update to user and retailer
+        emitOrderUpdate(orderId, status, { orderId, status }, retailerId);
 
         res.status(200).json({ success: true, data: order });
     } catch (error) {
@@ -111,7 +112,8 @@ export const completeDelivery = async (req, res) => {
         // Update Rider status to Online
         await RiderModel.findOneAndUpdate({ user: riderId }, { status: "Online" });
 
-        emitOrderUpdate(`order_${orderId}`, "DELIVERED", { orderId, refund: totalRefund });
+        const retailerId = order.items[0]?.retailer;
+        emitOrderUpdate(orderId, "DELIVERED", { orderId, refund: totalRefund }, retailerId);
 
         res.status(200).json({ success: true, message: "Order delivered successfully", refund: totalRefund });
     } catch (error) {

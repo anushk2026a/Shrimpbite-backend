@@ -2,6 +2,7 @@ import User from "../models/User.js";
 import Product from "../models/Product.js";
 import Order from "../models/Order.js";
 import { adjustBalance } from "../services/walletService.js";
+import { emitOrderUpdate } from "../services/socketService.js";
 
 // Get all approved shops (retailers)
 export const getPublicShops = async (req, res) => {
@@ -526,6 +527,9 @@ export const updateOrderItemStatus = async (req, res) => {
 
         await order.save();
 
+        // Emit real-time update
+        emitOrderUpdate(orderId, status, { orderId, status }, retailerId);
+
         res.status(200).json({ success: true, message: "Order status updated successfully", order });
     } catch (error) {
         res.status(500).json({ success: false, message: error.message });
@@ -603,6 +607,10 @@ export const assignRiderToOrder = async (req, res) => {
         order.rider = riderId;
         order.riderAssignmentStatus = "Pending";
         await order.save();
+
+        // Emit real-time update
+        emitOrderUpdate(orderId, "Rider Assigned", { orderId, riderId }, retailerId);
+
         res.status(200).json({ success: true, message: "Rider assigned successfully", data: order });
     } catch (error) {
         res.status(500).json({ success: false, message: error.message });

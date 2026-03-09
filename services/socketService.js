@@ -34,26 +34,33 @@ export const getIO = () => {
 };
 
 // Simplified emitters for common events
-export const emitOrderUpdate = async (orderId, status, data) => {
+export const emitOrderUpdate = async (orderId, status, data, retailerId = null) => {
+    const rooms = [`order_${orderId}`];
+    if (retailerId) rooms.push(`retailer_${retailerId}`);
+
     // 1. Try local emit
     if (io) {
-        io.to(orderId).emit("orderUpdate", { status, data });
+        rooms.forEach(room => {
+            io.to(room).emit("orderUpdate", { status, data, orderId });
+        });
     }
 
     // 2. Try relay emit (for Vercel)
     const relayUrl = process.env.SOCKET_RELAY_URL;
     if (relayUrl) {
         try {
-            await fetch(`${relayUrl}/emit`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    secret: process.env.SOCKET_SECRET || "shrimpbite_socket_relay_secret_2026",
-                    event: "orderUpdate",
-                    room: orderId,
-                    data: { status, data }
-                })
-            });
+            for (const room of rooms) {
+                await fetch(`${relayUrl}/emit`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        secret: process.env.SOCKET_SECRET || "shrimpbite_socket_relay_secret_2026",
+                        event: "orderUpdate",
+                        room: room,
+                        data: { status, data, orderId }
+                    })
+                });
+            }
         } catch (error) {
             console.error("Relay emit failed:", error.message);
         }
@@ -61,9 +68,10 @@ export const emitOrderUpdate = async (orderId, status, data) => {
 };
 
 export const emitChatUpdate = async (chatId, message) => {
+    const room = `chat_${chatId}`;
     // 1. Try local emit
     if (io) {
-        io.to(chatId).emit("newMessage", message);
+        io.to(room).emit("newMessage", message);
     }
 
     // 2. Try relay emit (for Vercel)
@@ -76,7 +84,7 @@ export const emitChatUpdate = async (chatId, message) => {
                 body: JSON.stringify({
                     secret: process.env.SOCKET_SECRET || "shrimpbite_socket_relay_secret_2026",
                     event: "newMessage",
-                    room: chatId,
+                    room: room,
                     data: message
                 })
             });
