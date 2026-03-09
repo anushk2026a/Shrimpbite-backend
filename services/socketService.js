@@ -34,18 +34,54 @@ export const getIO = () => {
 };
 
 // Simplified emitters for common events
-export const emitOrderUpdate = (orderId, status, data) => {
+export const emitOrderUpdate = async (orderId, status, data) => {
+    // 1. Try local emit
     if (io) {
         io.to(orderId).emit("orderUpdate", { status, data });
-    } else {
-        console.log(`Socket not initialized. Skipping emit for order ${orderId}`);
+    }
+
+    // 2. Try relay emit (for Vercel)
+    const relayUrl = process.env.SOCKET_RELAY_URL;
+    if (relayUrl) {
+        try {
+            await fetch(`${relayUrl}/emit`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    secret: process.env.SOCKET_SECRET || "shrimpbite_socket_relay_secret_2026",
+                    event: "orderUpdate",
+                    room: orderId,
+                    data: { status, data }
+                })
+            });
+        } catch (error) {
+            console.error("Relay emit failed:", error.message);
+        }
     }
 };
 
-export const emitChatUpdate = (chatId, message) => {
+export const emitChatUpdate = async (chatId, message) => {
+    // 1. Try local emit
     if (io) {
         io.to(chatId).emit("newMessage", message);
-    } else {
-        console.log(`Socket not initialized. Skipping emit for chat ${chatId}`);
+    }
+
+    // 2. Try relay emit (for Vercel)
+    const relayUrl = process.env.SOCKET_RELAY_URL;
+    if (relayUrl) {
+        try {
+            await fetch(`${relayUrl}/emit`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    secret: process.env.SOCKET_SECRET || "shrimpbite_socket_relay_secret_2026",
+                    event: "newMessage",
+                    room: chatId,
+                    data: message
+                })
+            });
+        } catch (error) {
+            console.error("Relay chat emit failed:", error.message);
+        }
     }
 };
