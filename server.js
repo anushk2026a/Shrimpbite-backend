@@ -5,16 +5,17 @@ import { initCronJobs } from "./cron.js";
 import { initSocket } from "./services/socketService.js";
 import paymentRoutes from "./routes/paymentRoutes.js";
 
-// Connect DB
-// await connectDB() // Disabled for Vercel - handled by middleware in app.js
+// Connect DB - Handled by middleware in app.js for serverless compatibility
+// await connectDB()
 
 // Register routes
 app.use("/api/payment", paymentRoutes)
 
-// Export app for Vercel
-export default app;
-
 /*
+-----------------------------------------
+Disabled for Vercel serverless deployment
+-----------------------------------------
+
 // Start Server
 const PORT = process.env.PORT || 5000
 const server = app.listen(PORT, () => {
@@ -24,4 +25,8 @@ const server = app.listen(PORT, () => {
 
 // Init Socket.io
 initSocket(server);
+
 */
+
+// Export app for Vercel
+export default app;
