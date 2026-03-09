@@ -16,7 +16,7 @@ import otpRoutes from "./routes/otpRoutes.js";
 import reviewRoutes from "./routes/reviewRoutes.js";
 import orderRoutes from "./routes/orderRoutes.js";
 import paymentRoutes from "./routes/paymentRoutes.js";
-
+import cronRoutes from "./routes/cronRoutes.js";
 const app = express()
 
 
@@ -41,7 +41,7 @@ app.use(cors({
 }));
 
 app.use(express.json())
-
+app.use("/api/cron", cronRoutes);
 // Connect to Database per request (more reliable for Vercel serverless)
 import connectDB from "./config/db.js"
 app.use(async (req, res, next) => {
