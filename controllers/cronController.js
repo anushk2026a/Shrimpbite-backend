@@ -11,7 +11,9 @@ export const runDailySubscriptionCron = async (req, res) => {
 
         console.log("Cron job started: generating subscription orders");
 
-        const stats = await generateDailyOrders();
+        // Allow manual date override for testing (e.g., ?date=2026-03-11)
+        const targetDate = req.query.date ? new Date(req.query.date) : new Date();
+        const stats = await generateDailyOrders(targetDate);
 
         res.status(200).json({
             success: true,

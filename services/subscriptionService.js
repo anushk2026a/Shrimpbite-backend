@@ -70,8 +70,10 @@ export const generateDailyOrders = async (targetDate = new Date()) => {
             subStart.setHours(0, 0, 0, 0);
             const targetDay = new Date(targetDate);
             targetDay.setHours(0, 0, 0, 0);
+
+            // If start date is in the future (beyond today), skip
             if (targetDay < subStart) {
-                console.log(`[SKIP] Not Started Yet: Sub ${sub._id} (Start: ${subStart.toDateString()}, Target: ${targetDay.toDateString()})`);
+                console.log(`[SKIP] Future Start: Sub ${sub._id} (Starts: ${subStart.toDateString()}, Today: ${targetDay.toDateString()})`);
                 stats.skipped++;
                 continue;
             }
