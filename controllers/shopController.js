@@ -465,10 +465,10 @@ export const getRetailerOrders = async (req, res) => {
             formattedOrders.push({
                 id: order.orderId || `#${order._id.toString().slice(-6).toUpperCase()}`,
                 product: productNames.join(", "),
-                date: new Date(order.createdAt).toLocaleString("en-GB", {
+                date: new Date(order.createdAt).toLocaleString("en-IN", {
+                    timeZone: "Asia/Kolkata",
                     day: "2-digit",
                     month: "2-digit",
-                    year: "numeric",
                     hour: "2-digit",
                     minute: "2-digit",
                     hour12: true
