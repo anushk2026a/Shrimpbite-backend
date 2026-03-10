@@ -43,7 +43,8 @@ export const generateDailyOrders = async (targetDate = new Date()) => {
                 const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
                 if (diffDays % 2 === 0) shouldDeliver = true;
             } else if (sub.frequency === "Weekly") {
-                if (sub.customDays && sub.customDays.includes(currentDayName)) {
+                // Case-insensitive check for day names
+                if (sub.customDays && sub.customDays.some(d => d.toLowerCase() === currentDayName.toLowerCase())) {
                     shouldDeliver = true;
                 }
             }
@@ -52,7 +53,14 @@ export const generateDailyOrders = async (targetDate = new Date()) => {
                 vDate.toDateString() === targetDate.toDateString()
             );
 
-            if (!shouldDeliver || isOnVacation) {
+            if (!shouldDeliver) {
+                console.log(`[SKIP] Frequency/Day Mismatch: Sub ${sub._id} (Freq: ${sub.frequency}, Days: ${sub.customDays}, Today: ${currentDayName})`);
+                stats.skipped++;
+                continue;
+            }
+
+            if (isOnVacation) {
+                console.log(`[SKIP] User on Vacation: Sub ${sub._id}`);
                 stats.skipped++;
                 continue;
             }
@@ -63,6 +71,7 @@ export const generateDailyOrders = async (targetDate = new Date()) => {
             const targetDay = new Date(targetDate);
             targetDay.setHours(0, 0, 0, 0);
             if (targetDay < subStart) {
+                console.log(`[SKIP] Not Started Yet: Sub ${sub._id} (Start: ${subStart.toDateString()}, Target: ${targetDay.toDateString()})`);
                 stats.skipped++;
                 continue;
             }
@@ -80,13 +89,13 @@ export const generateDailyOrders = async (targetDate = new Date()) => {
             });
 
             if (todayOrdersCount > 0) {
-                // Already generated for today
+                console.log(`[SKIP] Already Generated Today: Sub ${sub._id}`);
                 stats.skipped++;
                 continue;
             }
 
             if (product.dailyCapacity && todayOrdersCount >= product.dailyCapacity) {
-                console.log(`Capacity reached for ${product.name}. Skipping subscription ${sub._id}`);
+                console.log(`[SKIP] Capacity Reached: Product ${product.name}`);
                 stats.skipped++;
                 continue;
             }
