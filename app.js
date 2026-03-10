@@ -17,6 +17,7 @@ import reviewRoutes from "./routes/reviewRoutes.js";
 import orderRoutes from "./routes/orderRoutes.js";
 import paymentRoutes from "./routes/paymentRoutes.js";
 import cronRoutes from "./routes/cronRoutes.js";
+import favoriteRoutes from "./routes/favoriteRoutes.js";
 const app = express()
 
 
@@ -79,6 +80,7 @@ app.use("/api/reviews", reviewRoutes);
 app.use("/api/app/orders", orderRoutes);
 app.use("/api/payment", paymentRoutes);
 app.use("/api/cron", cronRoutes);
+app.use("/api/app/favorites", favoriteRoutes);
 
 // Basic test route
 app.get("/", (req, res) => {
