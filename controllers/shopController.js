@@ -298,7 +298,7 @@ export const getRetailerCustomers = async (req, res) => {
         const retailerId = req.user._id;
 
         // 1. Get all orders involving this retailer and populate customer info
-        const orders = await Order.find({ "items.retailer": retailerId }).populate("user", "name email phone profilePicture");
+        const orders = await Order.find({ "items.retailer": retailerId }).populate("user", "fullName email phoneNumber profilePicture");
 
         const customerMap = new Map();
 
@@ -326,6 +326,7 @@ export const getRetailerCustomers = async (req, res) => {
                     user: order.user,
                     orderCount: 1,
                     totalSpend: orderSpendForRetailer,
+                    orderIds: [order.orderId],
                     firstOrderDate: order.createdAt,
                     lastOrderDate: order.createdAt
                 });
@@ -333,6 +334,9 @@ export const getRetailerCustomers = async (req, res) => {
                 const customerData = customerMap.get(customerId);
                 customerData.orderCount++;
                 customerData.totalSpend += orderSpendForRetailer;
+                if (!customerData.orderIds.includes(order.orderId)) {
+                    customerData.orderIds.push(order.orderId);
+                }
                 if (new Date(order.createdAt) > new Date(customerData.lastOrderDate)) {
                     customerData.lastOrderDate = order.createdAt;
                 }
@@ -342,7 +346,7 @@ export const getRetailerCustomers = async (req, res) => {
             }
         });
 
-        const myCustomersArray = Array.from(customerMap.values()).map(({ user, orderCount, totalSpend, firstOrderDate, lastOrderDate }) => {
+        const myCustomersArray = Array.from(customerMap.values()).map(({ user, orderCount, totalSpend, orderIds, firstOrderDate, lastOrderDate }) => {
             let status = "Active";
             if (orderCount > 3 || totalSpend > 2000) status = "VIP";
             else if (new Date(firstOrderDate) >= thirtyDaysAgo) status = "New";
@@ -356,13 +360,14 @@ export const getRetailerCustomers = async (req, res) => {
 
             return {
                 id: user._id,
-                name: user.name,
-                email: user.email,
-                phone: user.phone || "+91 0000000000",
+                name: user.fullName || "Customer",
+                email: user.email || "N/A",
+                phone: user.phoneNumber || "N/A",
                 orderCount,
+                orderIds,
                 spend: totalSpend.toFixed(2),
                 status,
-                image: user.profilePicture || `https://api.dicebear.com/7.x/avataaars/svg?seed=${user.name.replace(/\s+/g, '')}`
+                image: user.profilePicture || `https://api.dicebear.com/7.x/avataaars/svg?seed=${(user.fullName || 'User').replace(/\s+/g, '')}`
             };
         });
 
