@@ -8,11 +8,9 @@ export const sendBulkNotification = async (req, res) => {
         // Find users based on type if needed. For now, sending to all customers
         const users = await AppUser.find({});
 
-        const notifications = users.map(user => {
-            if (user.fcmToken) {
-                return sendPushNotification(user.fcmToken, title, body);
-            }
-        });
+        const notifications = users
+            .filter(user => user.fcmToken)
+            .map(user => sendPushNotification(user.fcmToken, title, body));
 
         await Promise.all(notifications);
         res.json({ message: "Bulk notifications sent", count: users.length });
