@@ -87,7 +87,7 @@ export const updateRiderLocation = async (req, res) => {
 
         const activeOrders = await Order.find({
             rider: userId,
-            status: { $in: ["Accepted", "Out for Delivery"] }
+            status: { $in: ["Accepted", "Rider Accepted", "Out for Delivery", "Processing", "Rider Assigned"] }
         });
 
         activeOrders.forEach(order => {
@@ -245,13 +245,13 @@ export const respondToOrderAssignment = async (req, res) => {
 
         order.riderAssignmentStatus = response;
         if (response === "Accepted") {
-            order.status = "Accepted";
+            order.status = "Rider Accepted";
             order.rider = riderId;
 
             // Track status history
             order.statusHistory = order.statusHistory || [];
             order.statusHistory.push({
-                status: "Accepted",
+                status: "Rider Accepted",
                 changedBy: riderId,
                 role: 'rider',
                 timestamp: new Date()

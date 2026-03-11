@@ -468,7 +468,7 @@ export const getRetailerOrders = async (req, res) => {
             // Determine order status for this retailer
             let status = order.status;
 
-            if (status === 'Pending' || status === 'Processing') {
+            if (['Pending', 'Accepted', 'Processing', 'Preparing', 'Shipped', 'Out for Delivery', 'Rider Assigned', 'Rider Accepted'].includes(status)) {
                 pendingOrders++;
             } else if (status === 'Delivered' || status === 'Completed') {
                 completedOrders++;
@@ -533,6 +533,16 @@ export const updateOrderItemStatus = async (req, res) => {
             return res.status(400).json({ success: false, message: `Order is already in '${status}' status.` });
         }
 
+        // Enforce sequential flow for retailer actions
+        // Pending -> Accepted
+        // Accepted -> Processing
+        if (status === "Accepted" && order.status !== "Pending") {
+            return res.status(400).json({ success: false, message: "Order must be 'Pending' to mark as 'Accepted'." });
+        }
+        if (status === "Processing" && order.status !== "Accepted") {
+            return res.status(400).json({ success: false, message: "Order must be 'Accepted' to mark as 'Processing'." });
+        }
+
         // Update all items belonging to this retailer in this order
         let updated = false;
         order.items.forEach(item => {
@@ -546,19 +556,8 @@ export const updateOrderItemStatus = async (req, res) => {
             return res.status(400).json({ success: false, message: "No items found for this retailer in this order" });
         }
 
-        // Update overall order status if necessary
-        const allItemsStatus = order.items.map(i => i.status);
-        if (allItemsStatus.every(s => s === 'Delivered' || s === 'Completed')) {
-            order.status = 'Delivered';
-        } else if (allItemsStatus.some(s => s === 'Out for Delivery')) {
-            order.status = 'Out for Delivery';
-        } else if (allItemsStatus.some(s => s === 'Shipped')) {
-            order.status = 'Shipped';
-        } else if (allItemsStatus.some(s => s === 'Preparing' || s === 'Processing')) {
-            order.status = 'Processing';
-        } else if (allItemsStatus.some(s => s === 'Accepted')) {
-            order.status = 'Accepted';
-        }
+        // Update overall order status
+        order.status = status;
 
         // Push to statusHistory audit trail
         order.statusHistory = order.statusHistory || [];
@@ -578,7 +577,6 @@ export const updateOrderItemStatus = async (req, res) => {
         // Notify Retailer if status is Delivered
         if (status === "Delivered") {
             const customer = await (await import("../models/AppUser.js")).default.findById(userId);
-            const retailerUser = await User.findById(retailerId);
             createNotification(retailerId.toString(), {
                 title: `Order Delivered! 🎉`,
                 message: `Order #${orderId.slice(-6).toUpperCase()} delivered to ${customer?.fullName || "Customer"} customer by your team.`,
