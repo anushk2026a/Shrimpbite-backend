@@ -295,3 +295,65 @@ export const getDashboardStats = async (req, res) => {
         res.status(500).json({ success: false, message: error.message });
     }
 };
+
+// Get all orders for admin
+export const getAllOrders = async (req, res) => {
+    try {
+        const { page = 1, limit = 10, search = "", status, type } = req.query;
+        const query = {};
+
+        if (status && status !== "All") {
+            query.status = status;
+        }
+
+        if (type && type !== "All") {
+            query.orderType = type;
+        }
+
+        if (search) {
+            query.$or = [
+                { orderId: { $regex: search, $options: "i" } },
+                { status: { $regex: search, $options: "i" } }
+            ];
+        }
+
+        const skip = (parseInt(page) - 1) * parseInt(limit);
+
+        const orders = await Order.find(query)
+            .populate("items.product")
+            .populate("items.retailer", "businessDetails")
+            .populate("user", "fullName phoneNumber")
+            .sort({ createdAt: -1 })
+            .skip(skip)
+            .limit(parseInt(limit));
+
+        const totalOrders = await Order.countDocuments(query);
+
+        // Stats for admin
+        const pendingOrders = await Order.countDocuments({ status: { $in: ["Pending", "Accepted", "Processing", "Preparing", "Shipped", "Out for Delivery", "Rider Assigned", "Rider Accepted"] } });
+        const completedOrders = await Order.countDocuments({ status: { $in: ["Delivered", "Completed"] } });
+        const canceledOrders = await Order.countDocuments({ status: "Cancelled" });
+
+        res.status(200).json({
+            success: true,
+            data: {
+                orders,
+                stats: {
+                    totalOrders,
+                    pendingOrders,
+                    completedOrders,
+                    canceledOrders,
+                    avgOrderValue: "0.00"
+                }
+            },
+            pagination: {
+                totalOrders,
+                totalPages: Math.ceil(totalOrders / limit),
+                currentPage: parseInt(page),
+                limit: parseInt(limit)
+            }
+        });
+    } catch (error) {
+        res.status(500).json({ success: false, message: error.message });
+    }
+};

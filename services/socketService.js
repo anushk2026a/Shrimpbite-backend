@@ -59,7 +59,7 @@ export const getIO = () => {
 
 // Simplified emitters for common events
 export const emitOrderUpdate = async (orderId, status, data, retailerId = null, userId = null) => {
-    const rooms = [`order_${orderId}`];
+    const rooms = [`order_${orderId}`, "admin"];
     if (retailerId) rooms.push(`retailer_${retailerId}`);
     if (userId) rooms.push(`user_${userId}`);
 

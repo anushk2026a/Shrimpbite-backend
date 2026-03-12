@@ -7,7 +7,8 @@ import {
     createCategory,
     updateCategory,
     deleteCategory,
-    getDashboardStats
+    getDashboardStats,
+    getAllOrders
 } from "../controllers/adminController.js";
 import {
     getSubscriptionPlans,
@@ -44,5 +45,8 @@ router.put("/subscriptions/:id", updateSubscriptionPlan)
 router.delete("/subscriptions/:id", deleteSubscriptionPlan)
 
 
+
+// Order Management
+router.get("/orders", protect, adminOnly, getAllOrders)
 
 export default router
