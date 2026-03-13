@@ -58,7 +58,7 @@ export const getIO = () => {
 };
 
 // Simplified emitters for common events
-export const emitOrderUpdate = async (orderId, status, data, retailerId = null, userId = null) => {
+export const emitOrderUpdate = async (orderId, status, data, retailerId = null, userId = null, riderId = null) => {
     // 1. Determine all possible order rooms (ORD-XXX and potentially Mongo _id)
     const rooms = [`order_${orderId}`, "admin"];
     
@@ -71,6 +71,7 @@ export const emitOrderUpdate = async (orderId, status, data, retailerId = null, 
 
     if (retailerId) rooms.push(`retailer_${retailerId}`);
     if (userId) rooms.push(`user_${userId}`);
+    if (riderId) rooms.push(`rider_${riderId}`);
 
     const payload = { status, data, orderId };
     _log("Emitting Order Update", { data: { rooms, status, orderId } });

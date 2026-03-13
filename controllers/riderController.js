@@ -263,8 +263,8 @@ export const respondToOrderAssignment = async (req, res) => {
         const retailerId = order.items[0]?.retailer?._id || order.items[0]?.retailer;
         const userId = order.user?._id || order.user;
 
-        // Emit general order update to retailer & user rooms
-        await emitOrderUpdate(orderId, response, { orderId, response, order }, retailerId, userId);
+        // Emit general order update to retailer, user, and rider rooms
+        await emitOrderUpdate(orderId, response, { orderId, response, order }, retailerId, userId, riderId);
 
         // Notify Retailer when rider accepts
         if (response === "Accepted") {

@@ -669,8 +669,8 @@ export const assignRiderToOrder = async (req, res) => {
         order.status = "Rider Assigned"; // Sync main order status
         await order.save();
 
-        // Emit real-time update
-        await emitOrderUpdate(orderId, "Rider Assigned", { orderId, riderId }, retailerId);
+        // Emit real-time update to retailer and rider
+        await emitOrderUpdate(orderId, "Rider Assigned", { orderId, riderId, order }, retailerId, null, riderId);
 
         res.status(200).json({ success: true, message: "Rider assigned successfully", data: order });
     } catch (error) {
