@@ -211,6 +211,41 @@ export const updateProfile = async (req, res) => {
     }
 };
 
+// Update only Name (Used by Flutter App)
+export const updateName = async (req, res) => {
+    try {
+        const { fullName } = req.body;
+
+        if (!fullName) {
+            return res.status(400).json({ success: false, message: "Full name is required" });
+        }
+
+        const user = await AppUser.findById(req.user._id);
+        if (!user) return res.status(404).json({ success: false, message: "User not found" });
+
+        if (fullName === user.fullName) {
+            return res.status(400).json({ success: false, message: "New name cannot be the same as the current name" });
+        }
+
+        user.fullName = fullName;
+        await user.save();
+
+        return res.status(200).json({ 
+            success: true, 
+            message: "Name updated successfully", 
+            data: {
+                id: user._id,
+                fullName: user.fullName,
+                email: user.email,
+                phoneNumber: user.phoneNumber
+            }
+        });
+    } catch (error) {
+        console.error("updateName error:", error);
+        return res.status(500).json({ success: false, message: "Something went wrong while updating name" });
+    }
+};
+
 // Change password
 export const changePassword = async (req, res) => {
     try {

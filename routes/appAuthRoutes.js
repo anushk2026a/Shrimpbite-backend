@@ -8,6 +8,7 @@ import {
     loginUser,
     getProfile,
     updateProfile,
+    updateName,
     changePassword,
     forgotPassword,
     addAddress,
@@ -41,6 +42,9 @@ router.get("/profile", protectAppUser, getProfile);
 
 //update profile
 router.put("/profile", protectAppUser, updateProfile);
+
+//update name
+router.put("/update-name", protectAppUser, updateName);
 
 //change password
 router.put("/change-password", protectAppUser, changePassword);
