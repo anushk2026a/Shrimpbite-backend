@@ -91,8 +91,8 @@ export const updateRiderLocation = async (req, res) => {
         });
 
         activeOrders.forEach(order => {
-            // Room is order_{orderId}
-            emitOrderUpdate(`order_${order.orderId}`, "RIDER_LOCATION_UPDATE", {
+            // Use order.orderId directly, emitOrderUpdate adds the 'order_' prefix
+            emitOrderUpdate(order.orderId, "RIDER_LOCATION_UPDATE", {
                 lat,
                 lng,
                 orderId: order.orderId
