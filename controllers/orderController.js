@@ -35,9 +35,10 @@ export const placeOrder = async (req, res) => {
         // 2. Validate Stock and Calculate Total
         let totalAmount = 0;
         const orderItems = [];
+        let identifiedRetailer = cart.retailer; // Initial identifier
 
         for (const item of cart.items) {
-            const currentPrice = item.product.price; // Always use latest price from populated product
+            const currentPrice = item.product.price; 
             if (item.product.stock < item.quantity) {
                 return res.status(400).json({
                     success: false,
@@ -45,14 +46,22 @@ export const placeOrder = async (req, res) => {
                 });
             }
 
+            // Fallback: If cart.retailer is missing, use the retailer from the product itself
+            const itemRetailer = item.product.retailer || identifiedRetailer;
+            if (!identifiedRetailer) identifiedRetailer = itemRetailer;
+
             totalAmount += currentPrice * item.quantity;
             orderItems.push({
                 product: item.product._id,
-                retailer: cart.retailer,
+                retailer: itemRetailer,
                 quantity: item.quantity,
                 price: currentPrice,
                 status: "Pending"
             });
+        }
+
+        if (!identifiedRetailer) {
+            return res.status(400).json({ success: false, message: "Retailer not identified for items in cart" });
         }
 
         // 2.1 Wallet Balance Check
@@ -96,7 +105,7 @@ export const placeOrder = async (req, res) => {
             );
 
             if (updatedProduct.stock <= 5) {
-                createNotification(cart.retailer.toString(), {
+                createNotification(identifiedRetailer.toString(), {
                     title: "Low Inventory Alert! ⚠️",
                     message: `Product "${updatedProduct.name}" is running low on stock (${updatedProduct.stock}kg left).`,
                     type: "Inventory",
@@ -109,10 +118,10 @@ export const placeOrder = async (req, res) => {
         await Cart.findOneAndDelete({ user: userId });
 
         // 7. Socket Notification
-        await emitOrderUpdate(order.orderId, "Pending", order, cart.retailer, userId);
+        await emitOrderUpdate(order.orderId, "Pending", order, identifiedRetailer, userId);
 
         // Create Notification for Retailer
-        createNotification(cart.retailer.toString(), {
+        createNotification(identifiedRetailer.toString(), {
             title: "New Order Received! 🦐",
             message: `You have a new order (#${order._id.toString().slice(-6)}) for ₹${totalAmount}.`,
             type: "Order",
