@@ -94,7 +94,7 @@ export const toggleShopStatus = async (req, res) => {
         await user.save();
 
         // Broadcast the status change in real-time
-        emitShopStatusUpdate(user._id, user.isShopActive);
+        await emitShopStatusUpdate(user._id, user.isShopActive);
 
         res.status(200).json({ success: true, isShopActive: user.isShopActive });
     } catch (error) {
@@ -134,7 +134,7 @@ export const finalizeOrderWeight = async (req, res) => {
 
         // Emit real-time update
         const retailerId = req.user.id;
-        emitOrderUpdate(orderId, "Weight Finalized", { orderId, itemId, actualWeight, actualPrice }, retailerId);
+        await emitOrderUpdate(orderId, "Weight Finalized", { orderId, itemId, actualWeight, actualPrice }, retailerId);
 
         res.status(200).json({ success: true, diff, newPrice: actualPrice });
     } catch (error) {
@@ -577,7 +577,7 @@ export const updateOrderItemStatus = async (req, res) => {
 
         // Emit real-time update to order room, retailer room, and user room
         const userId = order.user?._id || order.user;
-        emitOrderUpdate(orderId, status, { orderId, status, statusHistory: order.statusHistory }, retailerId, userId);
+        await emitOrderUpdate(orderId, status, { orderId, status, statusHistory: order.statusHistory }, retailerId, userId);
 
         // Notify Retailer if status is Delivered
         if (status === "Delivered") {
@@ -670,7 +670,7 @@ export const assignRiderToOrder = async (req, res) => {
         await order.save();
 
         // Emit real-time update
-        emitOrderUpdate(orderId, "Rider Assigned", { orderId, riderId }, retailerId);
+        await emitOrderUpdate(orderId, "Rider Assigned", { orderId, riderId }, retailerId);
 
         res.status(200).json({ success: true, message: "Rider assigned successfully", data: order });
     } catch (error) {

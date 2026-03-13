@@ -59,25 +59,36 @@ export const getIO = () => {
 
 // Simplified emitters for common events
 export const emitOrderUpdate = async (orderId, status, data, retailerId = null, userId = null) => {
+    // 1. Determine all possible order rooms (ORD-XXX and potentially Mongo _id)
     const rooms = [`order_${orderId}`, "admin"];
+    
+    // If data contains the full order object, also emit to the Mongo _id room
+    // This handles cases where Flutter developer might join using the database ID
+    const mongoId = data?._id || data?.order?._id;
+    if (mongoId && mongoId.toString() !== orderId.toString()) {
+        rooms.push(`order_${mongoId}`);
+    }
+
     if (retailerId) rooms.push(`retailer_${retailerId}`);
     if (userId) rooms.push(`user_${userId}`);
 
     const payload = { status, data, orderId };
+    _log("Emitting Order Update", { data: { rooms, status, orderId } });
 
-    // 1. Try local emit
+    // 1. Local emit
     if (io) {
         rooms.forEach(room => {
             io.to(room).emit("orderUpdate", payload);
         });
     }
 
-    // 2. Try relay emit (for Vercel)
+    // 2. Relay emit (for Vercel)
     const relayUrl = process.env.SOCKET_RELAY_URL;
     if (relayUrl) {
         try {
-            for (const room of rooms) {
-                await fetch(`${relayUrl}/emit`, {
+            // Use Promise.all to await all relay sends
+            await Promise.all(rooms.map(room => 
+                fetch(`${relayUrl}/emit`, {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({
@@ -86,8 +97,8 @@ export const emitOrderUpdate = async (orderId, status, data, retailerId = null, 
                         room: room,
                         data: payload
                     })
-                });
-            }
+                })
+            ));
         } catch (error) {
             console.error("Relay emit failed:", error.message);
         }

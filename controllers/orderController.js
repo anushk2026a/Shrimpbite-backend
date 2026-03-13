@@ -109,7 +109,7 @@ export const placeOrder = async (req, res) => {
         await Cart.findOneAndDelete({ user: userId });
 
         // 7. Socket Notification
-        emitOrderUpdate(order.orderId, "Pending", order, cart.retailer, userId);
+        await emitOrderUpdate(order.orderId, "Pending", order, cart.retailer, userId);
 
         // Create Notification for Retailer
         createNotification(cart.retailer.toString(), {

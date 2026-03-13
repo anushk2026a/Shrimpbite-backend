@@ -48,7 +48,7 @@ export const updateDeliveryStatus = async (req, res) => {
 
         const retailerId = order.items[0]?.retailer?._id || order.items[0]?.retailer;
         const userId = order.user;
-        emitOrderUpdate(orderId, status, { orderId, status, statusHistory: order.statusHistory }, retailerId, userId);
+        await emitOrderUpdate(orderId, status, { orderId, status, statusHistory: order.statusHistory }, retailerId, userId);
 
         // Notify Retailer of status change
         if (status === "Delivered") {
@@ -96,7 +96,7 @@ export const updateRiderLocation = async (req, res) => {
                 lat,
                 lng,
                 orderId: order.orderId
-            });
+            }); // Note: location updates are high-frequency, sometimes we don't await them for perf, but here we can
         });
 
         res.status(200).json({ success: true });
@@ -149,7 +149,7 @@ export const completeDelivery = async (req, res) => {
         await RiderModel.findOneAndUpdate({ user: riderId }, { status: "Online" });
 
         const retailerId = order.items[0]?.retailer;
-        emitOrderUpdate(orderId, "DELIVERED", { orderId, refund: totalRefund }, retailerId);
+        await emitOrderUpdate(orderId, "DELIVERED", { orderId, refund: totalRefund }, retailerId);
 
         // Notify Retailer of delivery
         const customer = await (await import("../models/AppUser.js")).default.findById(order.user);
@@ -264,7 +264,7 @@ export const respondToOrderAssignment = async (req, res) => {
         const userId = order.user?._id || order.user;
 
         // Emit general order update to retailer & user rooms
-        emitOrderUpdate(orderId, response, { orderId, response, order }, retailerId, userId);
+        await emitOrderUpdate(orderId, response, { orderId, response, order }, retailerId, userId);
 
         // Notify Retailer when rider accepts
         if (response === "Accepted") {
@@ -277,7 +277,7 @@ export const respondToOrderAssignment = async (req, res) => {
             });
 
             // Emit special riderAssigned popup event to user with rider details
-            emitRiderAssigned(orderId, userId, {
+            await emitRiderAssigned(orderId, userId, {
                 name: riderUser?.name || "Your Rider",
                 phone: riderUser?.phone || "",
                 riderId
