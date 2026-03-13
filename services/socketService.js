@@ -179,3 +179,28 @@ export const emitNotification = async (recipientId, notification) => {
         }
     }
 };
+
+
+export const emitShopStatusUpdate = (shopId, isShopActive) => {
+    const payload = { shopId, isShopActive };
+    _log("Emitting Shop Status Update", { data: payload });
+
+    if (io) {
+        io.emit("shopStatusUpdate", payload);
+    }
+
+    // Relay for Vercel if needed
+    const relayUrl = process.env.SOCKET_RELAY_URL;
+    if (relayUrl) {
+        fetch(`${relayUrl}/emit`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                secret: process.env.SOCKET_SECRET || "shrimpbite_socket_relay_secret_2026",
+                event: "shopStatusUpdate",
+                broadcast: true,
+                data: payload
+            })
+        }).catch(err => console.error("Relay shop status update failed:", err.message));
+    }
+};

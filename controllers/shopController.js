@@ -2,7 +2,7 @@ import User from "../models/User.js";
 import Product from "../models/Product.js";
 import Order from "../models/Order.js";
 import { adjustBalance } from "../services/walletService.js";
-import { emitOrderUpdate } from "../services/socketService.js";
+import { emitOrderUpdate, emitShopStatusUpdate } from "../services/socketService.js";
 
 // Get all approved shops (retailers)
 export const getPublicShops = async (req, res) => {
@@ -27,6 +27,7 @@ export const getPublicShops = async (req, res) => {
             businessName: shop.businessDetails?.businessName,
             image: shop.businessDetails?.storeImage || "",
             location: shop.businessDetails?.location?.city || "",
+            isShopActive: shop.isShopActive ?? true,
             rating: 4.5, // Placeholder for future rating system
             deliveryTime: "30-45 mins" // Placeholder
         }));
@@ -58,7 +59,8 @@ export const getShopDetails = async (req, res) => {
                 businessName: shop.businessDetails?.businessName,
                 image: shop.businessDetails?.storeImage || "",
                 address: shop.businessDetails?.location,
-                contact: shop.email
+                contact: shop.email,
+                isShopActive: shop.isShopActive ?? true
             }
         });
     } catch (error) {
@@ -90,6 +92,9 @@ export const toggleShopStatus = async (req, res) => {
 
         user.isShopActive = !user.isShopActive;
         await user.save();
+
+        // Broadcast the status change in real-time
+        emitShopStatusUpdate(user._id, user.isShopActive);
 
         res.status(200).json({ success: true, isShopActive: user.isShopActive });
     } catch (error) {
