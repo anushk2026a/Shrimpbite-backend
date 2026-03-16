@@ -42,7 +42,7 @@ export const registerUser = async (req, res) => {
 // Login
 export const loginUser = async (req, res) => {
     try {
-        const { email, password } = req.body
+        const { email, password, fcmToken } = req.body
 
         // Special handling for test accounts
         if (email === "admin@test.com" && password === "123456") {
@@ -60,6 +60,12 @@ export const loginUser = async (req, res) => {
 
         const isPasswordCorrect = await bcrypt.compare(password, user.password)
         if (!isPasswordCorrect) return res.status(400).json({ message: "Invalid credentials" })
+        
+        // Always update FCM token if provided during login
+        if (fcmToken) {
+            user.fcmToken = fcmToken;
+            await user.save();
+        }
 
         const token = jwt.sign({ id: user._id, role: user.role }, process.env.JWT_SECRET, { expiresIn: "1d" })
 

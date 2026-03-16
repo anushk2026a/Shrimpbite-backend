@@ -60,6 +60,9 @@ const appUserSchema = new mongoose.Schema(
         loyaltyPoints: {
             type: Number,
             default: 0
+        },
+        fcmToken: {
+            type: String
         }
     },
     { timestamps: true }

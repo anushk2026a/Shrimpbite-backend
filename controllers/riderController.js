@@ -60,6 +60,14 @@ export const updateDeliveryStatus = async (req, res) => {
                 type: "Order",
                 referenceId: orderId
             });
+
+            // Notify Customer
+            createNotification(userId.toString(), {
+                title: `Order Delivered! 🎉`,
+                message: `Your order #${orderId.slice(-6).toUpperCase()} has been delivered. Enjoy your meal!`,
+                type: "Order",
+                referenceId: orderId
+            });
         } else {
             createNotification(retailerId.toString(), {
                 title: `Order Update: ${status} 📦`,
@@ -67,6 +75,16 @@ export const updateDeliveryStatus = async (req, res) => {
                 type: "Order",
                 referenceId: orderId
             });
+
+            // Notify Customer for key milestones
+            if (status === "Out for Delivery") {
+                createNotification(userId.toString(), {
+                    title: `Out for Delivery! 🛵`,
+                    message: `Your order #${orderId.slice(-6).toUpperCase()} is out for delivery. Get ready!`,
+                    type: "Order",
+                    referenceId: orderId
+                });
+            }
         }
 
         res.status(200).json({ success: true, data: order });

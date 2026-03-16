@@ -49,6 +49,11 @@ export const registerUser = async (req, res) => {
             lowerCaseAlphabets: false
         });
 
+        // 6.1 fcmToken assignment
+        const { fcmToken } = req.body;
+        if (fcmToken) newUser.fcmToken = fcmToken;
+        await newUser.save();
+
         // Expiry 5 minutes
         const expiresAt = new Date(Date.now() + 5 * 60 * 1000);
 
@@ -82,7 +87,7 @@ export const registerUser = async (req, res) => {
 // Login
 export const loginUser = async (req, res) => {
     try {
-        const { phoneNumber, password } = req.body;
+        const { phoneNumber, password, fcmToken } = req.body;
 
         if (!phoneNumber || !password) {
             return res.status(400).json({ success: false, message: "Phone number and password required" });
@@ -115,6 +120,12 @@ export const loginUser = async (req, res) => {
                 message: "Account not verified. Please verify your phone number.",
                 phoneNumber: user.phoneNumber
             });
+        }
+
+        // Always update FCM token if provided during login
+        if (fcmToken) {
+            user.fcmToken = fcmToken;
+            await user.save();
         }
 
         const token = jwt.sign({ id: user._id, role }, process.env.JWT_SECRET, { expiresIn: "7d" });
@@ -350,7 +361,7 @@ export const deleteAddress = async (req, res) => {
 // Google Auth (Firebase)
 export const googleAuth = async (req, res) => {
     try {
-        const { idToken, phoneNumber } = req.body;
+        const { idToken, phoneNumber, fcmToken } = req.body;
 
         if (!idToken) {
             return res.status(400).json({ success: false, message: "ID Token is required" });
@@ -422,6 +433,12 @@ export const googleAuth = async (req, res) => {
                 updated = true;
             }
             if (updated) await user.save();
+        }
+
+        // Always update FCM token if provided during login
+        if (fcmToken) {
+            user.fcmToken = fcmToken;
+            await user.save();
         }
 
         // Finalize Login

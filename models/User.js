@@ -64,7 +64,10 @@ const userSchema = new mongoose.Schema({
             licenseUrl: String,
             gstCertificateUrl: String
         },
-        storeImage: String
+        storeImage: String,
+        fcmToken: {
+            type: String
+        }
     }
 }, { timestamps: true })
 

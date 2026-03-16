@@ -580,12 +580,36 @@ export const updateOrderItemStatus = async (req, res) => {
         const userId = order.user?._id || order.user;
         await emitOrderUpdate(orderId, status, { orderId, status, statusHistory: order.statusHistory }, retailerId, userId);
 
-        // Notify Retailer if status is Delivered
+        // Notify Retailer and Customer of status changes
         if (status === "Delivered") {
             const customer = await (await import("../models/AppUser.js")).default.findById(userId);
             createNotification(retailerId.toString(), {
                 title: `Order Delivered! 🎉`,
                 message: `Order #${orderId.slice(-6).toUpperCase()} delivered to ${customer?.fullName || "Customer"} customer by your team.`,
+                type: "Order",
+                referenceId: orderId
+            });
+
+            // Notify Customer
+            createNotification(userId.toString(), {
+                title: `Order Delivered! 🎉`,
+                message: `Your order #${orderId.slice(-6).toUpperCase()} has been delivered. Enjoy your meal!`,
+                type: "Order",
+                referenceId: orderId
+            });
+        } else {
+            // Notify Customer for status updates like Accepted or Processing
+            const statusEmojis = {
+                "Accepted": "✅",
+                "Processing": "👨‍🍳",
+                "Preparing": "🍱",
+                "Shipped": "🚚"
+            };
+            const emoji = statusEmojis[status] || "📦";
+            
+            createNotification(userId.toString(), {
+                title: `Order Update: ${status} ${emoji}`,
+                message: `Your order #${orderId.slice(-6).toUpperCase()} is now ${status.toLowerCase()}.`,
                 type: "Order",
                 referenceId: orderId
             });
@@ -672,6 +696,22 @@ export const assignRiderToOrder = async (req, res) => {
 
         // Emit real-time update to retailer and rider
         await emitOrderUpdate(orderId, "Rider Assigned", { orderId, riderId, order }, retailerId, null, riderId);
+
+        // Notify Rider via Push Notification
+        try {
+            const riderUser = await User.findById(riderId).select("fcmToken name");
+            if (riderUser && riderUser.fcmToken) {
+                const { sendPushNotification } = await import("../services/notificationService.js");
+                await sendPushNotification(
+                    riderUser.fcmToken,
+                    "New Order Assigned! 🏍️",
+                    `You have been assigned to Order #${orderId.slice(-6).toUpperCase()}. Open the app for details.`,
+                    { type: "NewAssignment", orderId }
+                );
+            }
+        } catch (pushErr) {
+            console.error("Non-blocking Rider Assignment Push error:", pushErr.message);
+        }
 
         res.status(200).json({ success: true, message: "Rider assigned successfully", data: order });
     } catch (error) {

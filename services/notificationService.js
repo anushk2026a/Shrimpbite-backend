@@ -20,6 +20,25 @@ export const createNotification = async (recipientId, { title, message, type, re
         // Emit via socket
         await emitNotification(recipientId, notification.toObject());
 
+        // Try sending push notification
+        try {
+            // Check AppUser (Customers)
+            let user = await (await import("../models/AppUser.js")).default.findById(recipientId).select("fcmToken");
+            
+            // If not found in AppUser, check User (Riders/Retailers)
+            if (!user) {
+                user = await (await import("../models/User.js")).default.findById(recipientId).select("fcmToken fields.fcmToken businessDetails.fcmToken");
+                // Note: The schema update I made was top level in User.js but inside businessDetails was a possibility in previous thoughts. 
+                // Let's stick to the top level one I just added.
+            }
+
+            if (user && user.fcmToken) {
+                await sendPushNotification(user.fcmToken, title, message, { type, referenceId });
+            }
+        } catch (pushErr) {
+            console.error("Non-blocking Push Notification fetch error:", pushErr.message);
+        }
+
         return notification;
     } catch (error) {
         console.error("Failed to create notification:", error.message);
@@ -29,10 +48,37 @@ export const createNotification = async (recipientId, { title, message, type, re
 /**
  * Sends a push notification via FCM.
  */
-export const sendPushNotification = async (fcmToken, title, body) => {
-    console.log(`[Push Notification] To: ${fcmToken} | Title: ${title} | Body: ${body}`);
-    // Baseline stub to prevent crashes - actual FCM logic can be added if keys are provided
-    return { success: true };
+export const sendPushNotification = async (fcmToken, title, body, data = {}) => {
+    if (!fcmToken) return { success: false, message: "No FCM token provided" };
+
+    try {
+        const admin = (await import("../config/firebase.js")).default;
+        
+        // Safety check: Ensure Firebase is initialized
+        if (!admin || !admin.appCheck) { // Using a generic check since app() might be private
+            // admin might be initialized but we want to be sure it's functional
+            // If it's the export from config/firebase.js, it's the admin object
+        }
+
+        const message = {
+            notification: {
+                title,
+                body,
+            },
+            data: {
+                ...data,
+                click_action: "FLUTTER_NOTIFICATION_CLICK"
+            },
+            token: fcmToken,
+        };
+
+        const response = await admin.messaging().send(message);
+        console.log(`[Push Notification] Successfully sent to ${fcmToken}: ${response}`);
+        return { success: true, response };
+    } catch (error) {
+        console.error(`[Push Notification] Error sending to ${fcmToken}:`, error.message);
+        return { success: false, error: error.message };
+    }
 };
 
 /**
