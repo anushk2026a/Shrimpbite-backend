@@ -64,3 +64,44 @@ export const updateFcmToken = async (req, res) => {
         res.status(500).json({ success: false, message: "Server error" });
     }
 };
+
+export const testNotifyAll = async (req, res) => {
+    try {
+        const { title, message, secret } = req.body;
+
+        // Simple safety check
+        if (secret !== "shrimpbite_test_2026") {
+            return res.status(403).json({ success: false, message: "Invalid secret" });
+        }
+
+        if (!title || !message) {
+            return res.status(400).json({ success: false, message: "Title and message are required" });
+        }
+
+        const AppUser = (await import("../models/AppUser.js")).default;
+        const User = (await import("../models/User.js")).default;
+
+        // Fetch all tokens from both collections
+        const customerTokens = await AppUser.find({ fcmToken: { $exists: true, $ne: "" } }).distinct("fcmToken");
+        const staffTokens = await User.find({ fcmToken: { $exists: true, $ne: "" } }).distinct("fcmToken");
+        
+        // Combine all tokens
+        const allTokens = [...customerTokens, ...staffTokens];
+
+        if (allTokens.length === 0) {
+            return res.status(404).json({ success: true, message: "No devices found with FCM tokens" });
+        }
+
+        const { sendMulticastNotification } = await import("../services/notificationService.js");
+        const result = await sendMulticastNotification(allTokens, title, message, { type: "Test" });
+
+        res.status(200).json({ 
+            success: true, 
+            message: `Sent to ${allTokens.length} devices`,
+            result
+        });
+    } catch (error) {
+        console.error("testNotifyAll error:", error);
+        res.status(500).json({ success: false, message: error.message });
+    }
+};

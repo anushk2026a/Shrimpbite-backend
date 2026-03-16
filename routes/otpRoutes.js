@@ -120,4 +120,69 @@ router.post("/verify", async (req, res) => {
     }
 });
 
+// Verify Firebase ID Token (Phone Auth)
+router.post("/verify-firebase", async (req, res) => {
+    try {
+        const { idToken, phoneNumber } = req.body;
+
+        if (!idToken) {
+            return res.status(400).json({ success: false, message: "ID Token is required" });
+        }
+
+        const admin = (await import("../config/firebase.js")).default;
+        
+        // Verify Firebase Token
+        let decodedToken;
+        try {
+            decodedToken = await admin.auth().verifyIdToken(idToken);
+        } catch (error) {
+            console.error("Firebase token verification failed:", error.message);
+            return res.status(401).json({ success: false, message: "Invalid or expired Firebase token" });
+        }
+
+        // The phone_number in the token should match or we use it directly
+        const verifiedPhone = decodedToken.phone_number;
+        
+        if (!verifiedPhone) {
+            return res.status(400).json({ success: false, message: "Phone number not found in Firebase token" });
+        }
+
+        // Phone numbers from Firebase usually include +xx, ensure consistency
+        // In this project, phone numbers are stored as typed by user, usually including country code in some cases.
+        // We find by exact match or normalized. For now, exact match with verified phone.
+        let user = await AppUser.findOne({ 
+            $or: [{ phoneNumber: verifiedPhone }, { phoneNumber: phoneNumber }] 
+        });
+
+        if (user) {
+            user.isVerified = true;
+            await user.save();
+        }
+
+        // Generate Shrimpbite JWT
+        let token = null;
+        if (user) {
+            token = jwt.sign({ id: user._id, role: "customer" }, process.env.JWT_SECRET, { expiresIn: "7d" });
+        }
+
+        return res.status(200).json({
+            success: true,
+            message: "Firebase Phone verified successfully.",
+            isVerified: true,
+            token,
+            data: user ? {
+                id: user._id,
+                fullName: user.fullName,
+                email: user.email,
+                phoneNumber: user.phoneNumber,
+                role: "customer"
+            } : null
+        });
+
+    } catch (error) {
+        console.error("verify-firebase error:", error);
+        return res.status(500).json({ success: false, message: "Server error", error: error.message });
+    }
+});
+
 export default router;

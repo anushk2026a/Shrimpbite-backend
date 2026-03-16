@@ -42,34 +42,14 @@ export const registerUser = async (req, res) => {
             console.log("Welcome email failed:", error.message);
         }
 
-        // Generate 6 digit OTP
-        const otpCode = otpGenerator.generate(6, {
-            upperCaseAlphabets: false,
-            specialChars: false,
-            lowerCaseAlphabets: false
-        });
-
         // 6.1 fcmToken assignment
         const { fcmToken } = req.body;
         if (fcmToken) newUser.fcmToken = fcmToken;
         await newUser.save();
 
-        // Expiry 5 minutes
-        const expiresAt = new Date(Date.now() + 5 * 60 * 1000);
-
-        // Save OTP in DB
-        await Otp.findOneAndUpdate(
-            { phoneNumber },
-            { otp: otpCode, expiresAt },
-            { upsert: true, new: true }
-        );
-
-        console.log(`[REGISTRATION OTP] for ${phoneNumber}: ${otpCode}`);
-
         return res.status(201).json({
             success: true,
-            message: "User registered successfully. Please verify your phone number to login.",
-            otp: otpCode, // For development convenience
+            message: "User registered successfully. Please verify your phone number using Firebase.",
             data: {
                 id: newUser._id,
                 fullName: newUser.fullName,

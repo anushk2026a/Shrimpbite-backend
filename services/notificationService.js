@@ -82,6 +82,41 @@ export const sendPushNotification = async (fcmToken, title, body, data = {}) => 
 };
 
 /**
+ * Sends a push notification to multiple tokens via FCM.
+ */
+export const sendMulticastNotification = async (fcmTokens, title, body, data = {}) => {
+    if (!fcmTokens || fcmTokens.length === 0) return { success: false, message: "No FCM tokens provided" };
+
+    try {
+        const admin = (await import("../config/firebase.js")).default;
+        
+        // Remove duplicates and empty tokens
+        const uniqueTokens = [...new Set(fcmTokens.filter(t => t))];
+
+        if (uniqueTokens.length === 0) return { success: false, message: "No valid FCM tokens found" };
+
+        const message = {
+            notification: {
+                title,
+                body,
+            },
+            data: {
+                ...data,
+                click_action: "FLUTTER_NOTIFICATION_CLICK"
+            },
+            tokens: uniqueTokens,
+        };
+
+        const response = await admin.messaging().sendEachForMulticast(message);
+        console.log(`[Multicast Notification] Sent ${response.successCount} successfully, ${response.failureCount} failed.`);
+        return { success: true, response };
+    } catch (error) {
+        console.error(`[Multicast Notification] Error:`, error.message);
+        return { success: false, error: error.message };
+    }
+};
+
+/**
  * Sends an email receipt/notification.
  */
 export const sendEmailReceipt = async (email, { orderId, html }) => {
