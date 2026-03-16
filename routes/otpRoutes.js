@@ -31,29 +31,12 @@ router.post("/send", async (req, res) => {
 
         console.log(`[OTP] for ${phoneNumber}: ${otpCode}`);
 
-        // Try sending push notification for a realistic experience
-        try {
-            const { sendPushNotification } = await import("../services/notificationService.js");
-            const user = await AppUser.findOne({ phoneNumber }).select("fcmToken");
-            
-            if (user && user.fcmToken) {
-                await sendPushNotification(
-                    user.fcmToken,
-                    "Shrimpbite OTP",
-                    `Your Shrimpbite OTP is ${otpCode}. Do not share it with anyone.`,
-                    { type: "OTP", otp: otpCode }
-                );
-            } else {
-                console.log(`[OTP Skip Push] No FCM token found for ${phoneNumber}`);
-            }
-        } catch (pushErr) {
-            console.error("Non-blocking OTP Push Notification error:", pushErr.message);
-        }
+        console.log(`[OTP Skip Push] Send via SMS using Firebase Phone Auth on client side.`);
 
         return res.status(200).json({
             success: true,
-            message: "OTP sent successfully",
-            otp: otpCode
+            message: "OTP generation requested. Please use Firebase Phone Auth on the client to send SMS.",
+            otp: otpCode // Still returning for dev testing if needed
         });
     } catch (error) {
         console.error("otp send error:", error);
