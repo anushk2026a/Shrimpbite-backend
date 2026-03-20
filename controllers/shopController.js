@@ -638,60 +638,86 @@ export const updateOrderItemStatus = async (req, res) => {
 };
 
 import Review from "../models/Review.js";
+import OrderReview from "../models/OrderReview.js";
 
 export const getRetailerReviews = async (req, res) => {
     try {
         const retailerId = req.user._id;
 
-        const reviews = await Review.find({ retailer: retailerId })
-            .populate("user", "name")
+        // 1. Fetch Product Reviews
+        const productReviews = await Review.find({ retailer: retailerId })
+            .populate("user", "fullName profilePicture email")
             .populate("product", "name")
             .sort({ createdAt: -1 });
 
-        const totalReviews = reviews.length;
+        // 2. Fetch General Order Reviews that involved this retailer
+        const orderReviews = await OrderReview.find({ retailers: retailerId })
+            .populate("user", "fullName profilePicture email")
+            .populate("order", "orderId")
+            .sort({ createdAt: -1 });
+
+        // 3. Combine Reviews into a single list
+        const formattedProductReviews = productReviews.map(r => ({
+            id: r._id,
+            user: r.user ? r.user.fullName : "Anonymous",
+            rating: r.rating,
+            comment: r.comment,
+            date: new Date(r.createdAt).toLocaleDateString("en-GB", { day: '2-digit', month: 'short', year: 'numeric' }),
+            item: r.product ? r.product.name : "Unknown Product",
+            type: "Product",
+            tags: r.tags || [],
+            isVerified: true
+        }));
+
+        const formattedOrderReviews = orderReviews.map(r => ({
+            id: r._id,
+            user: r.user ? r.user.fullName : "Anonymous",
+            rating: r.rating,
+            comment: r.comment,
+            date: new Date(r.createdAt).toLocaleDateString("en-GB", { day: '2-digit', month: 'short', year: 'numeric' }),
+            item: r.order ? `Order #${r.order.orderId?.slice(-6).toUpperCase()}` : "Entire Order",
+            type: "General Experience",
+            tags: [],
+            isVerified: true
+        }));
+
+        const allReviews = [...formattedProductReviews, ...formattedOrderReviews].sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
+        // 4. Calculate Stats (Only based on Product Reviews if we follow the shop rating logic)
+        // User said shop rating is from products
+        const totalReviewsCount = productReviews.length;
         let averageRating = 0;
-        let positiveReviews = 0; // >= 4 stars
+        let positiveReviews = 0;
         const distribution = { 5: 0, 4: 0, 3: 0, 2: 0, 1: 0 };
 
-        if (totalReviews > 0) {
+        if (totalReviewsCount > 0) {
             let totalRating = 0;
-            reviews.forEach(r => {
+            productReviews.forEach(r => {
                 totalRating += r.rating;
                 distribution[r.rating]++;
                 if (r.rating >= 4) positiveReviews++;
             });
-            averageRating = (totalRating / totalReviews).toFixed(1);
+            averageRating = (totalRating / totalReviewsCount).toFixed(1);
         }
 
         const stats = {
             averageRating,
-            totalReviews,
-            positivePercentage: totalReviews > 0 ? Math.round((positiveReviews / totalReviews) * 100) : 0,
+            totalReviews: totalReviewsCount,
+            positivePercentage: totalReviewsCount > 0 ? Math.round((positiveReviews / totalReviewsCount) * 100) : 0,
             distribution: {
-                5: totalReviews > 0 ? Math.round((distribution[5] / totalReviews) * 100) : 0,
-                4: totalReviews > 0 ? Math.round((distribution[4] / totalReviews) * 100) : 0,
-                3: totalReviews > 0 ? Math.round((distribution[3] / totalReviews) * 100) : 0,
-                2: totalReviews > 0 ? Math.round((distribution[2] / totalReviews) * 100) : 0,
-                1: totalReviews > 0 ? Math.round((distribution[1] / totalReviews) * 100) : 0,
+                5: totalReviewsCount > 0 ? Math.round((distribution[5] / totalReviewsCount) * 100) : 0,
+                4: totalReviewsCount > 0 ? Math.round((distribution[4] / totalReviewsCount) * 100) : 0,
+                3: totalReviewsCount > 0 ? Math.round((distribution[3] / totalReviewsCount) * 100) : 0,
+                2: totalReviewsCount > 0 ? Math.round((distribution[2] / totalReviewsCount) * 100) : 0,
+                1: totalReviewsCount > 0 ? Math.round((distribution[1] / totalReviewsCount) * 100) : 0,
             }
         };
-
-        const formattedReviews = reviews.map(r => ({
-            id: r._id,
-            user: r.user ? r.user.name : "Anonymous",
-            rating: r.rating,
-            comment: r.comment,
-            date: new Date(r.createdAt).toLocaleDateString("en-GB", { day: '2-digit', month: 'short', year: 'numeric' }),
-            product: r.product ? r.product.name : "Unknown Product",
-            tags: r.tags || [],
-            isVerified: true // Mock verified for now
-        }));
 
         res.status(200).json({
             success: true,
             data: {
                 stats,
-                reviews: formattedReviews
+                reviews: allReviews
             }
         });
     } catch (error) {

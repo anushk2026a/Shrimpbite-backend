@@ -11,6 +11,10 @@ const OrderReviewSchema = new mongoose.Schema({
         ref: "AppUser",
         required: true
     },
+    retailers: [{
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "User"
+    }],
     rating: {
         type: Number,
         required: true,

@@ -19,9 +19,16 @@ export const submitOrderReview = async (req, res) => {
         // 2. Submit General Order Review (Experince)
         let savedOrderReview;
         if (orderRating) {
+            // Get unique retailers from order items to link this review to multiple shops if necessary
+            const retailers = [...new Set(order.items.map(item => item.retailer.toString()))];
+
             savedOrderReview = await OrderReview.findOneAndUpdate(
                 { order: orderId, user: userId },
-                { rating: orderRating, comment: orderComment },
+                { 
+                    rating: orderRating, 
+                    comment: orderComment,
+                    retailers: retailers 
+                },
                 { upsert: true, new: true }
             );
         }
@@ -109,14 +116,12 @@ export const getRiderRating = async (req, res) => {
 // @access  Public
 export const getProductReviews = async (req, res) => {
     try {
-        const reviews = await Review.find({ product: req.params.productId })
-            .populate("user", "fullName profilePicture")
-            .sort("-createdAt");
+        const reviews = await Review.find({ product: req.params.productId });
 
         res.status(200).json({
             success: true,
-            count: reviews.length,
-            data: reviews
+            count: reviews.length
+            // Detailed reviews removed for customers as per requirement
         });
     } catch (error) {
         res.status(500).json({ success: false, message: error.message });
