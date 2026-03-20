@@ -5,6 +5,7 @@ import Review from "../models/Review.js";
 import { adjustBalance } from "../services/walletService.js";
 import { emitOrderUpdate, emitShopStatusUpdate } from "../services/socketService.js";
 import { createNotification } from "../services/notificationService.js";
+import OrderReview from "../models/OrderReview.js";
 
 // Helper function to calculate shop rating
 const calculateShopRating = async (retailerId) => {
@@ -637,8 +638,6 @@ export const updateOrderItemStatus = async (req, res) => {
     }
 };
 
-import Review from "../models/Review.js";
-import OrderReview from "../models/OrderReview.js";
 
 export const getRetailerReviews = async (req, res) => {
     try {
