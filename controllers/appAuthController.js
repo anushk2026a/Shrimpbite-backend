@@ -283,7 +283,8 @@ export const forgotPassword = async (req, res) => {
 // Add address
 export const addAddress = async (req, res) => {
     try {
-        const user = await AppUser.findById(req.user._id);
+        const userId = req.userId || req.user.id || req.user._id;
+        const user = await AppUser.findById(userId);
         if (!user) return res.status(404).json({ success: false, message: "User not found" });
 
         const address = req.body;
@@ -299,20 +300,21 @@ export const addAddress = async (req, res) => {
         return res.status(201).json({ success: true, message: "Address added", data: user.addresses });
     } catch (error) {
         console.error("addAddress error:", error);
-        return res.status(500).json({ success: false, message: "Server error" });
+        return res.status(500).json({ success: false, message: error.message });
     }
 };
 
 // Get addresses
 export const getAddresses = async (req, res) => {
     try {
-        const user = await AppUser.findById(req.user._id);
+        const userId = req.userId || req.user.id || req.user._id;
+        const user = await AppUser.findById(userId);
         if (!user) return res.status(404).json({ success: false, message: "User not found" });
 
         return res.status(200).json({ success: true, data: user.addresses });
     } catch (error) {
         console.error("getAddresses error:", error);
-        return res.status(500).json({ success: false, message: "Server error" });
+        return res.status(500).json({ success: false, message: error.message });
     }
 };
 
@@ -320,7 +322,8 @@ export const getAddresses = async (req, res) => {
 export const deleteAddress = async (req, res) => {
     try {
         const { id } = req.params;
-        const user = await AppUser.findById(req.user._id);
+        const userId = req.userId || req.user.id || req.user._id;
+        const user = await AppUser.findById(userId);
         if (!user) return res.status(404).json({ success: false, message: "User not found" });
 
         const prevLen = user.addresses.length;
@@ -335,7 +338,7 @@ export const deleteAddress = async (req, res) => {
         return res.status(200).json({ success: true, message: "Address removed", data: user.addresses });
     } catch (error) {
         console.error("deleteAddress error:", error);
-        return res.status(500).json({ success: false, message: "Server error" });
+        return res.status(500).json({ success: false, message: error.message });
     }
 };
 // Google Auth (Firebase)
