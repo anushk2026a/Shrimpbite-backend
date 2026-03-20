@@ -39,6 +39,9 @@ router.post("/register", registerUser);
 //login
 router.post("/login", loginUser);
 
+//google auth
+router.post("/google", googleAuth);
+
 //get profile
 router.get("/profile", protectAppUser, getProfile);
 
