@@ -3,6 +3,7 @@ import Product from "../models/Product.js";
 import Order from "../models/Order.js";
 import { adjustBalance } from "../services/walletService.js";
 import { emitOrderUpdate, emitShopStatusUpdate } from "../services/socketService.js";
+import { createNotification } from "../services/notificationService.js";
 
 // Get all approved shops (retailers)
 export const getPublicShops = async (req, res) => {
