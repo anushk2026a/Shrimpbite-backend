@@ -34,6 +34,12 @@ export const createProduct = async (req, res) => {
             ...req.body,
             retailer: req.user._id
         };
+
+        // If category is an empty string, remove it to avoid Mongoose casting errors
+        if (productData.category === "") {
+            delete productData.category;
+        }
+
         const product = await Product.create(productData);
         res.status(201).json({ success: true, data: product });
     } catch (error) {
@@ -45,9 +51,15 @@ export const createProduct = async (req, res) => {
 export const updateProduct = async (req, res) => {
     try {
         const { id } = req.params;
+        const updateData = { ...req.body };
+
+        if (updateData.category === "") {
+            delete updateData.category;
+        }
+
         const product = await Product.findOneAndUpdate(
             { _id: id, retailer: req.user._id },
-            req.body,
+            updateData,
             { new: true, runValidators: true }
         );
         if (!product) return res.status(404).json({ success: false, message: "Product not found" });
