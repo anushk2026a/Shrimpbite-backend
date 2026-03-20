@@ -1,24 +1,19 @@
 import mongoose from "mongoose";
 
-const ReviewSchema = new mongoose.Schema({
-    user: {
+const RiderReviewSchema = new mongoose.Schema({
+    rider: {
         type: mongoose.Schema.Types.ObjectId,
-        ref: "User",
+        ref: "User", // Riders are Users with role 'rider'
         required: true
     },
-    product: {
+    user: {
         type: mongoose.Schema.Types.ObjectId,
-        ref: "Product",
+        ref: "AppUser",
         required: true
     },
     order: {
         type: mongoose.Schema.Types.ObjectId,
         ref: "Order",
-        required: false
-    },
-    retailer: {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: "User",
         required: true
     },
     rating: {
@@ -26,14 +21,10 @@ const ReviewSchema = new mongoose.Schema({
         required: true,
         min: 1,
         max: 5
-    },
-    comment: {
-        type: String,
-        required: true
-    },
-    tags: [{
-        type: String
-    }]
+    }
 }, { timestamps: true });
 
-export default mongoose.model("Review", ReviewSchema);
+// Prevent duplicate rider reviews for the same order
+RiderReviewSchema.index({ order: 1, rider: 1 }, { unique: true });
+
+export default mongoose.model("RiderReview", RiderReviewSchema);

@@ -1,9 +1,18 @@
 import User from "../models/User.js";
 import Product from "../models/Product.js";
 import Order from "../models/Order.js";
+import Review from "../models/Review.js";
 import { adjustBalance } from "../services/walletService.js";
 import { emitOrderUpdate, emitShopStatusUpdate } from "../services/socketService.js";
 import { createNotification } from "../services/notificationService.js";
+
+// Helper function to calculate shop rating
+const calculateShopRating = async (retailerId) => {
+    const reviews = await Review.find({ retailer: retailerId });
+    if (reviews.length === 0) return 4.5; // Default for new shops
+    const total = reviews.reduce((acc, curr) => acc + curr.rating, 0);
+    return Number((total / reviews.length).toFixed(1));
+};
 
 // Get all approved shops (retailers)
 export const getPublicShops = async (req, res) => {
@@ -22,15 +31,18 @@ export const getPublicShops = async (req, res) => {
             .select("name email businessDetails isShopActive createdAt")
             .sort({ createdAt: -1 });
 
-        const minimalShops = shops.map(shop => ({
-            id: shop._id,
-            name: shop.businessDetails?.storeDisplayName || shop.businessDetails?.businessName || shop.name,
-            businessName: shop.businessDetails?.businessName,
-            image: shop.businessDetails?.storeImage || "",
-            location: shop.businessDetails?.location?.city || "",
-            isShopActive: shop.isShopActive ?? true,
-            rating: 4.5, // Placeholder for future rating system
-            deliveryTime: "30-45 mins" // Placeholder
+        const minimalShops = await Promise.all(shops.map(async (shop) => {
+            const rating = await calculateShopRating(shop._id);
+            return {
+                id: shop._id,
+                name: shop.businessDetails?.storeDisplayName || shop.businessDetails?.businessName || shop.name,
+                businessName: shop.businessDetails?.businessName,
+                image: shop.businessDetails?.storeImage || "",
+                location: shop.businessDetails?.location?.city || "",
+                isShopActive: shop.isShopActive ?? true,
+                rating: rating,
+                deliveryTime: "30-45 mins"
+            };
         }));
 
         res.status(200).json({
@@ -52,6 +64,8 @@ export const getShopDetails = async (req, res) => {
             return res.status(404).json({ success: false, message: "Shop not found or not approved" });
         }
 
+        const rating = await calculateShopRating(shop._id);
+
         res.status(200).json({
             success: true,
             data: {
@@ -61,7 +75,8 @@ export const getShopDetails = async (req, res) => {
                 image: shop.businessDetails?.storeImage || "",
                 address: shop.businessDetails?.location,
                 contact: shop.email,
-                isShopActive: shop.isShopActive ?? true
+                isShopActive: shop.isShopActive ?? true,
+                rating: rating
             }
         });
     } catch (error) {
