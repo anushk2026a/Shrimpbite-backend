@@ -7,32 +7,28 @@ import { emitNotification } from "../services/socketService.js";
 export const sendBulkNotification = async (req, res) => {
     try {
         const { title, body, targetType } = req.body; // targetType: 'all', 'retailer', 'rider', 'customer'
-        let targetTokens = [];
+        let pushTokens = [];
         let retailerIds = [];
 
-        // 1. Fetch tokens from AppUser (Customers)
+        // 1. Fetch tokens from AppUser (Customers) - Always FCM
         if (targetType === "all" || targetType === "customer") {
             const customers = await AppUser.find({ fcmToken: { $exists: true, $ne: "" } }).select("fcmToken");
-            targetTokens = [...targetTokens, ...customers.map(u => u.fcmToken)];
+            pushTokens = [...pushTokens, ...customers.map(u => u.fcmToken)];
         }
 
-        // 2. Fetch tokens and IDs from User (Retailers & Riders)
-        if (targetType === "all" || targetType === "retailer" || targetType === "rider") {
-            const query = { fcmToken: { $exists: true, $ne: "" } };
-            if (targetType === "retailer") query.role = "retailer";
-            if (targetType === "rider") query.role = "rider";
-            
-            const users = await User.find(query).select("fcmToken _id role");
-            targetTokens = [...targetTokens, ...users.map(u => u.fcmToken)];
-            
-            // Collect retailer IDs for database notifications
-            retailerIds = users.filter(u => u.role === "retailer").map(u => u._id);
+        // 2. Fetch riders for FCM
+        if (targetType === "all" || targetType === "rider") {
+            const riders = await User.find({ role: "rider", fcmToken: { $exists: true, $ne: "" } }).select("fcmToken");
+            pushTokens = [...pushTokens, ...riders.map(u => u.fcmToken)];
         }
 
-        // 3. Remove duplicate tokens
-        const uniqueTokens = [...new Set(targetTokens)];
+        // 3. Fetch retailers for Database/Panel (regardless of FCM token)
+        if (targetType === "all" || targetType === "retailer") {
+            const retailers = await User.find({ role: "retailer" }).select("_id");
+            retailerIds = retailers.map(u => u._id);
+        }
 
-        // 4. Create Database Notifications for Retailers (if targeted)
+        // 4. Create Database Notifications for Retailers
         if (retailerIds.length > 0) {
             const dbNotifications = retailerIds.map(id => ({
                 recipient: id,
@@ -50,19 +46,27 @@ export const sendBulkNotification = async (req, res) => {
             });
         }
 
-        if (uniqueTokens.length === 0 && retailerIds.length === 0) {
-            return res.status(404).json({ success: false, message: "No active users found for this segment." });
+        // 5. Clean push tokens (remove duplicates)
+        const uniquePushTokens = [...new Set(pushTokens)];
+
+        // 6. Final verification - If NO push tokens AND NO retailers, then error
+        if (uniquePushTokens.length === 0 && retailerIds.length === 0) {
+            return res.status(404).json({ success: false, message: "No users found in this segment (Retailers, Riders, or Customers)." });
         }
 
-        // 5. Dispatch Push Notifications
-        const pushPromises = uniqueTokens.map(token => sendPushNotification(token, title, body));
-        await Promise.all(pushPromises);
+        // 7. Dispatch FCM only to those in the push list (Customers/Riders)
+        if (uniquePushTokens.length > 0) {
+            const pushPromises = uniquePushTokens.map(token => sendPushNotification(token, title, body));
+            await Promise.all(pushPromises);
+        }
 
         res.json({ 
             success: true, 
-            message: `Broadcast complete. Sent to ${uniqueTokens.length} devices and ${retailerIds.length} retailer panels.`,
-            pushCount: uniqueTokens.length,
-            panelCount: retailerIds.length
+            message: `Dispatch successful.`,
+            details: {
+                pushNotificationsSent: uniquePushTokens.length,
+                panelNotificationsSent: retailerIds.length
+            }
         });
 
     } catch (error) {
