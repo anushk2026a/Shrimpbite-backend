@@ -643,72 +643,111 @@ export const getRetailerReviews = async (req, res) => {
     try {
         const retailerId = req.user._id;
 
-        // 1. Fetch Product Reviews
-        const productReviews = await Review.find({ retailer: retailerId })
-            .populate("user", "fullName profilePicture email")
-            .populate("product", "name")
-            .sort({ createdAt: -1 });
+        // 1. Fetch Product Reviews and General Experience Reviews for this retailer
+        const [productReviews, orderReviews] = await Promise.all([
+            Review.find({ retailer: retailerId })
+                .populate("user", "fullName profilePicture phoneNumber email")
+                .populate("product", "name")
+                .populate("order", "orderId")
+                .sort({ createdAt: -1 }),
+            OrderReview.find({ retailers: retailerId })
+                .populate("user", "fullName profilePicture phoneNumber email")
+                .populate("order", "orderId")
+                .sort({ createdAt: -1 })
+        ]);
 
-        // 2. Fetch General Order Reviews that involved this retailer
-        const orderReviews = await OrderReview.find({ retailers: retailerId })
-            .populate("user", "fullName profilePicture email")
-            .populate("order", "orderId")
-            .sort({ createdAt: -1 });
+        // 2. Group reviews by Order ID
+        const groupedByOrder = {};
 
-        // 3. Combine Reviews into a single list
-        const formattedProductReviews = productReviews.map(r => ({
-            id: r._id,
-            user: r.user ? r.user.fullName : "Anonymous",
-            rating: r.rating,
-            comment: r.comment,
-            date: new Date(r.createdAt).toLocaleDateString("en-GB", { day: '2-digit', month: 'short', year: 'numeric' }),
-            item: r.product ? r.product.name : "Unknown Product",
-            type: "Product",
-            tags: r.tags || [],
-            isVerified: true
-        }));
+        // Process Product Reviews
+        productReviews.forEach(r => {
+            const orderId = r.order?._id?.toString() || r.order?.toString() || "No-Order";
+            if (!groupedByOrder[orderId]) {
+                groupedByOrder[orderId] = {
+                    orderId: r.order?.orderId || "One-time Purchase",
+                    user: r.user ? {
+                        name: r.user.fullName,
+                        phone: r.user.phoneNumber || "N/A",
+                        image: r.user.profilePicture
+                    } : { name: "Anonymous", phone: "N/A" },
+                    date: r.createdAt,
+                    overallExperience: null,
+                    productRatings: []
+                };
+            }
+            groupedByOrder[orderId].productRatings.push({
+                productName: r.product?.name || "Unknown Product",
+                rating: r.rating,
+                comment: r.comment || ""
+            });
+        });
 
-        const formattedOrderReviews = orderReviews.map(r => ({
-            id: r._id,
-            user: r.user ? r.user.fullName : "Anonymous",
-            rating: r.rating,
-            comment: r.comment,
-            date: new Date(r.createdAt).toLocaleDateString("en-GB", { day: '2-digit', month: 'short', year: 'numeric' }),
-            item: r.order ? `Order #${r.order.orderId?.slice(-6).toUpperCase()}` : "Entire Order",
-            type: "General Experience",
-            tags: [],
-            isVerified: true
-        }));
+        // Process General Order Reviews
+        orderReviews.forEach(r => {
+            const orderId = r.order?._id?.toString() || r.order?.toString() || "No-Order";
+            if (!groupedByOrder[orderId]) {
+                groupedByOrder[orderId] = {
+                    orderId: r.order?.orderId || "Subscription",
+                    user: r.user ? {
+                        name: r.user.fullName,
+                        phone: r.user.phoneNumber || "N/A",
+                        image: r.user.profilePicture
+                    } : { name: "Anonymous", phone: "N/A" },
+                    date: r.createdAt,
+                    overallExperience: null,
+                    productRatings: []
+                };
+            }
+            groupedByOrder[orderId].overallExperience = {
+                rating: r.rating,
+                comment: r.comment || ""
+            };
+        });
 
-        const allReviews = [...formattedProductReviews, ...formattedOrderReviews].sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+        // 3. Convert to sorted array and format dates
+        const reviewsByOrder = Object.values(groupedByOrder)
+            .sort((a, b) => new Date(b.date) - new Date(a.date))
+            .map(group => ({
+                ...group,
+                date: new Date(group.date).toLocaleDateString("en-GB", { 
+                    day: '2-digit', month: 'short', year: 'numeric' 
+                })
+            }));
 
-        // 4. Calculate Stats (Only based on Product Reviews if we follow the shop rating logic)
-        // User said shop rating is from products
-        const totalReviewsCount = productReviews.length;
-        let averageRating = 0;
-        let positiveReviews = 0;
+        // 4. Calculate Stats (Base it on the consolidated ratings)
+        let totalVal = 0;
+        let count = 0;
+        let positive = 0;
         const distribution = { 5: 0, 4: 0, 3: 0, 2: 0, 1: 0 };
 
-        if (totalReviewsCount > 0) {
-            let totalRating = 0;
-            productReviews.forEach(r => {
-                totalRating += r.rating;
-                distribution[r.rating]++;
-                if (r.rating >= 4) positiveReviews++;
+        reviewsByOrder.forEach(o => {
+            if (o.overallExperience) {
+                totalVal += o.overallExperience.rating;
+                distribution[o.overallExperience.rating]++;
+                if (o.overallExperience.rating >= 4) positive++;
+                count++;
+            }
+            o.productRatings.forEach(pr => {
+                totalVal += pr.rating;
+                // We factor in product ratings into stats if overall is missing
+                if (!o.overallExperience) {
+                    distribution[pr.rating]++;
+                    if (pr.rating >= 4) positive++;
+                    count++;
+                }
             });
-            averageRating = (totalRating / totalReviewsCount).toFixed(1);
-        }
+        });
 
         const stats = {
-            averageRating,
-            totalReviews: totalReviewsCount,
-            positivePercentage: totalReviewsCount > 0 ? Math.round((positiveReviews / totalReviewsCount) * 100) : 0,
+            averageRating: count > 0 ? (totalVal / count).toFixed(1) : "0.0",
+            totalReviews: count,
+            positivePercentage: count > 0 ? Math.round((positive / count) * 100) : 0,
             distribution: {
-                5: totalReviewsCount > 0 ? Math.round((distribution[5] / totalReviewsCount) * 100) : 0,
-                4: totalReviewsCount > 0 ? Math.round((distribution[4] / totalReviewsCount) * 100) : 0,
-                3: totalReviewsCount > 0 ? Math.round((distribution[3] / totalReviewsCount) * 100) : 0,
-                2: totalReviewsCount > 0 ? Math.round((distribution[2] / totalReviewsCount) * 100) : 0,
-                1: totalReviewsCount > 0 ? Math.round((distribution[1] / totalReviewsCount) * 100) : 0,
+                5: count > 0 ? Math.round((distribution[5] / count) * 100) : 0,
+                4: count > 0 ? Math.round((distribution[4] / count) * 100) : 0,
+                3: count > 0 ? Math.round((distribution[3] / count) * 100) : 0,
+                2: count > 0 ? Math.round((distribution[2] / count) * 100) : 0,
+                1: count > 0 ? Math.round((distribution[1] / count) * 100) : 0,
             }
         };
 
@@ -716,7 +755,7 @@ export const getRetailerReviews = async (req, res) => {
             success: true,
             data: {
                 stats,
-                reviews: allReviews
+                reviews: reviewsByOrder
             }
         });
     } catch (error) {
