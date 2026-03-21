@@ -1,8 +1,16 @@
+import mongoose from "mongoose";
 import Notification from "../models/Notification.js";
 
 export const getNotifications = async (req, res) => {
     try {
-        const notifications = await Notification.find({ recipient: req.user._id })
+        const userId = req.user._id;
+
+        // Check if the ID is a valid ObjectId (avoids crash for test IDs like 'admin-test-id')
+        if (!mongoose.Types.ObjectId.isValid(userId)) {
+            return res.status(200).json({ success: true, notifications: [] });
+        }
+
+        const notifications = await Notification.find({ recipient: userId })
             .sort({ createdAt: -1 })
             .limit(50);
 
@@ -15,6 +23,9 @@ export const getNotifications = async (req, res) => {
 export const markAsRead = async (req, res) => {
     try {
         const { id } = req.params;
+        if (!mongoose.Types.ObjectId.isValid(id)) {
+            return res.status(400).json({ success: false, message: "Invalid notification ID" });
+        }
         await Notification.findByIdAndUpdate(id, { isRead: true });
         res.status(200).json({ success: true, message: "Notification marked as read" });
     } catch (error) {
@@ -24,7 +35,13 @@ export const markAsRead = async (req, res) => {
 
 export const markAllAsRead = async (req, res) => {
     try {
-        await Notification.updateMany({ recipient: req.user._id, isRead: false }, { isRead: true });
+        const userId = req.user._id;
+
+        if (!mongoose.Types.ObjectId.isValid(userId)) {
+            return res.status(200).json({ success: true, message: "All notifications marked as read" });
+        }
+
+        await Notification.updateMany({ recipient: userId, isRead: false }, { isRead: true });
         res.status(200).json({ success: true, message: "All notifications marked as read" });
     } catch (error) {
         res.status(500).json({ success: false, message: error.message });
