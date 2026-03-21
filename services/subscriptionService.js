@@ -104,6 +104,13 @@ export const generateDailyOrders = async (targetDate = new Date()) => {
                 continue;
             }
 
+            // [NEW] Prevent multiple notifications/orders if job is triggered repeatedly
+            if (sub.lastGeneratedDate && sub.lastGeneratedDate.toDateString() === targetDate.toDateString()) {
+                console.log(`[SKIP] Already processed for today: Sub ${sub._id}`);
+                stats.skipped++;
+                continue;
+            }
+
             // 5. Create Order & Debit Wallet
             const amount = sub.product.price * sub.quantity;
 
@@ -171,7 +178,7 @@ export const generateDailyOrders = async (targetDate = new Date()) => {
             console.error(`Failed to generate order for subscription ${sub._id}:`, error.message);
             stats.failed++;
 
-            // Notify user if balance is insufficient
+            // Notify user and flag as processed even if failed to prevent spam
             if (error.message.includes("Insufficient wallet balance")) {
                 try {
                     await createNotification(sub.user.toString(), {
@@ -180,8 +187,12 @@ export const generateDailyOrders = async (targetDate = new Date()) => {
                         type: "System",
                         referenceId: sub._id.toString()
                     });
+
+                    // Update lastGeneratedDate even on failure to avoid duplicate notifications today
+                    sub.lastGeneratedDate = targetDate;
+                    await sub.save();
                 } catch (notifErr) {
-                    console.error("Failed to notify user about low balance:", notifErr.message);
+                    console.error("Failed to notify user/save sub state:", notifErr.message);
                 }
             }
         }
