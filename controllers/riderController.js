@@ -2,7 +2,8 @@ import User from "../models/User.js";
 import Order from "../models/Order.js";
 import RiderModel from "../models/Rider.js";
 import bcrypt from "bcryptjs";
-import { emitOrderUpdate, emitRiderAssigned } from "../services/socketService.js";
+import { emitOrderUpdate, emitRiderAssigned, emitOrderDelivered } from "../services/socketService.js";
+
 import { createNotification } from "../services/notificationService.js";
 
 export const getRiderOrders = async (req, res) => {
@@ -49,6 +50,11 @@ export const updateDeliveryStatus = async (req, res) => {
         const retailerId = order.items[0]?.retailer?._id || order.items[0]?.retailer;
         const userId = order.user;
         await emitOrderUpdate(orderId, status, { orderId, status, statusHistory: order.statusHistory }, retailerId, userId);
+        
+        if (status === "Delivered") {
+            await emitOrderDelivered(orderId, userId, { orderId, status });
+        }
+
 
         // Notify Retailer of status change
         if (status === "Delivered") {
@@ -167,7 +173,9 @@ export const completeDelivery = async (req, res) => {
         await RiderModel.findOneAndUpdate({ user: riderId }, { status: "Online" });
 
         const retailerId = order.items[0]?.retailer;
-        await emitOrderUpdate(orderId, "DELIVERED", { orderId, refund: totalRefund }, retailerId);
+        await emitOrderUpdate(orderId, "DELIVERED", { orderId, refund: totalRefund }, retailerId, order.user);
+        await emitOrderDelivered(orderId, order.user, { orderId, refund: totalRefund });
+
 
         // Notify Retailer of delivery
         const customer = await (await import("../models/AppUser.js")).default.findById(order.user);

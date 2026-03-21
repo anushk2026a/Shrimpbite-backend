@@ -190,6 +190,35 @@ export const emitNotification = async (recipientId, notification) => {
 };
 
 
+export const emitOrderDelivered = async (orderId, userId, orderData) => {
+    const room = `user_${userId}`;
+    const payload = { orderId, ...orderData, status: "Delivered" };
+
+    _log("Emitting orderDelivered (Review Trigger)", { data: { room, orderId } });
+
+    if (io) {
+        io.to(room).emit("orderDelivered", payload);
+    }
+
+    const relayUrl = process.env.SOCKET_RELAY_URL;
+    if (relayUrl) {
+        try {
+            await fetch(`${relayUrl}/emit`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    secret: process.env.SOCKET_SECRET || "shrimpbite_socket_relay_secret_2026",
+                    event: "orderDelivered",
+                    room: room,
+                    data: payload
+                })
+            });
+        } catch (error) {
+            console.error("Relay orderDelivered emit failed:", error.message);
+        }
+    }
+};
+
 export const emitShopStatusUpdate = (shopId, isShopActive) => {
     const payload = { shopId, isShopActive };
     _log("Emitting Shop Status Update", { data: payload });
