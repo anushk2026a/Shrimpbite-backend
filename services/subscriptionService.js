@@ -4,6 +4,8 @@ import { emitOrderUpdate } from "./socketService.js";
 import Product from "../models/Product.js";
 import { adjustBalance } from "./walletService.js";
 import mongoose from "mongoose";
+import { createNotification } from "./notificationService.js";
+
 
 export const createSubscription = async (userId, subscriptionData) => {
     // Basic validation: Check if product exists and user has min balance
@@ -164,9 +166,24 @@ export const generateDailyOrders = async (targetDate = new Date()) => {
 
             stats.created++;
 
+
         } catch (error) {
             console.error(`Failed to generate order for subscription ${sub._id}:`, error.message);
             stats.failed++;
+
+            // Notify user if balance is insufficient
+            if (error.message.includes("Insufficient wallet balance")) {
+                try {
+                    await createNotification(sub.user.toString(), {
+                        title: "Subscription Delivery Failed ⚠️",
+                        message: `Your scheduled delivery of "${sub.product.name}" wasn't processed today due to insufficient wallet balance. Please top up to resume regular deliveries.`,
+                        type: "System",
+                        referenceId: sub._id.toString()
+                    });
+                } catch (notifErr) {
+                    console.error("Failed to notify user about low balance:", notifErr.message);
+                }
+            }
         }
     }
 
