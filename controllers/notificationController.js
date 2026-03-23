@@ -122,3 +122,40 @@ export const testNotifyAll = async (req, res) => {
         res.status(500).json({ success: false, message: error.message });
     }
 };
+
+export const deleteNotification = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const userId = req.user?.id || req.user?._id;
+
+        if (!mongoose.Types.ObjectId.isValid(id)) {
+            return res.status(400).json({ success: false, message: "Invalid notification ID" });
+        }
+
+        const notification = await Notification.findOneAndDelete({ _id: id, recipient: userId });
+
+        if (!notification) {
+            return res.status(404).json({ success: false, message: "Notification not found or unauthorized" });
+        }
+
+        res.status(200).json({ success: true, message: "Notification deleted successfully" });
+    } catch (error) {
+        res.status(500).json({ success: false, message: error.message });
+    }
+};
+
+export const deleteAllNotifications = async (req, res) => {
+    try {
+        const userId = req.user?.id || req.user?._id;
+
+        if (!mongoose.Types.ObjectId.isValid(userId)) {
+            return res.status(400).json({ success: false, message: "Invalid user ID" });
+        }
+
+        await Notification.deleteMany({ recipient: userId });
+
+        res.status(200).json({ success: true, message: "All notifications deleted successfully" });
+    } catch (error) {
+        res.status(500).json({ success: false, message: error.message });
+    }
+};
