@@ -1,6 +1,6 @@
 import express from "express";
 import protectAppUser from "../middleware/appAuthMiddleware.js";
-import { updateFcmToken } from "../controllers/notificationController.js";
+import { updateFcmToken, getNotifications, markAsRead, markAllAsRead } from "../controllers/notificationController.js";
 
 const router = express.Router();
 
@@ -81,6 +81,9 @@ router.delete("/cart/clear", protectAppUser, clearCart);   // Alias
 router.delete("/cart", protectAppUser, clearCart);
 
 // --- Notifications / FCM ---
+router.get("/notifications", protectAppUser, getNotifications);
+router.patch("/notifications/read/:id", protectAppUser, markAsRead);
+router.patch("/notifications/read-all", protectAppUser, markAllAsRead);
 router.post("/update-fcm-token", protectAppUser, updateFcmToken);
 
 export default router;

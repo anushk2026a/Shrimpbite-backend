@@ -28,9 +28,21 @@ export const sendBulkNotification = async (req, res) => {
             retailerIds = retailers.map(u => u._id);
         }
 
-        // 4. Create Database Notifications for Retailers
-        if (retailerIds.length > 0) {
-            const dbNotifications = retailerIds.map(id => ({
+        // 4. Create Database Notifications for ALL targets (Retailers, Customers, Riders)
+        let allRecipientIds = [...retailerIds];
+
+        if (targetType === "all" || targetType === "customer") {
+            const allCustomers = await AppUser.find({}).select("_id");
+            allRecipientIds = [...allRecipientIds, ...allCustomers.map(u => u._id)];
+        }
+
+        if (targetType === "all" || targetType === "rider") {
+            const allRiders = await User.find({ role: "rider" }).select("_id");
+            allRecipientIds = [...allRecipientIds, ...allRiders.map(u => u._id)];
+        }
+
+        if (allRecipientIds.length > 0) {
+            const dbNotifications = allRecipientIds.map(id => ({
                 recipient: id,
                 title,
                 message: body,
@@ -40,9 +52,10 @@ export const sendBulkNotification = async (req, res) => {
             // Bulk insert into database
             const createdNotifications = await Notification.insertMany(dbNotifications);
 
-            // Emit via socket for real-time web panel update
+            // Emit via socket for real-time web panel update (Retailers only have socket connection based on IDs typically)
+            // But we can just loop over created non-customer notifications or emit to all, socketService handles invalid IDs gracefully
             createdNotifications.forEach(notif => {
-                emitNotification(notif.recipient, notif.toObject());
+                emitNotification(notif.recipient.toString(), notif.toObject());
             });
         }
 

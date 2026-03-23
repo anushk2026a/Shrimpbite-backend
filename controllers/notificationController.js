@@ -3,7 +3,7 @@ import Notification from "../models/Notification.js";
 
 export const getNotifications = async (req, res) => {
     try {
-        const userId = req.user._id;
+        const userId = req.user?.id || req.user?._id;
 
         // Check if the ID is a valid ObjectId (avoids crash for test IDs like 'admin-test-id')
         if (!mongoose.Types.ObjectId.isValid(userId)) {
@@ -35,7 +35,7 @@ export const markAsRead = async (req, res) => {
 
 export const markAllAsRead = async (req, res) => {
     try {
-        const userId = req.user._id;
+        const userId = req.user?.id || req.user?._id;
 
         if (!mongoose.Types.ObjectId.isValid(userId)) {
             return res.status(200).json({ success: true, message: "All notifications marked as read" });
