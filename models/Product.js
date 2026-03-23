@@ -57,6 +57,22 @@ const ProductSchema = new mongoose.Schema({
         type: String,
         enum: ["Published", "Draft", "Archived"],
         default: "Published"
+    },
+    rating: {
+        type: Number,
+        default: 0
+    },
+    hasDiscount: {
+        type: Boolean,
+        default: false
+    },
+    isFreeShipping: {
+        type: Boolean,
+        default: false
+    },
+    isSameDayDelivery: {
+        type: Boolean,
+        default: false
     }
 }, { timestamps: true });
 

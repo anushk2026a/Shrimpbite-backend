@@ -80,3 +80,81 @@ export const deleteProduct = async (req, res) => {
         res.status(500).json({ success: false, message: error.message });
     }
 };
+
+// Get public products with advanced filtering for the app
+export const getPublicProducts = async (req, res) => {
+    try {
+        const {
+            minPrice,
+            maxPrice,
+            minRating,
+            hasDiscount,
+            freeShipping,
+            sameDayDelivery,
+            category,
+            sortBy,
+            search
+        } = req.query;
+
+        // Build the database query
+        let query = { status: "Published" };
+
+        if (minPrice || maxPrice) {
+            query.price = {};
+            if (minPrice) query.price.$gte = Number(minPrice);
+            if (maxPrice) query.price.$lte = Number(maxPrice);
+        }
+
+        if (minRating) {
+            query.rating = { $gte: Number(minRating) };
+        }
+
+        if (hasDiscount === 'true') {
+            query.hasDiscount = true;
+        }
+
+        if (freeShipping === 'true') {
+            query.isFreeShipping = true;
+        }
+
+        if (sameDayDelivery === 'true') {
+            query.isSameDayDelivery = true;
+        }
+
+        if (category) {
+            query.category = category; // Assuming matching ID or we can find by slug later
+        }
+
+        if (search) {
+            query.$or = [
+                { name: { $regex: search, $options: "i" } },
+                { description: { $regex: search, $options: "i" } }
+            ];
+        }
+
+        // Determine sort order
+        let sortOption = { createdAt: -1 }; // default newest
+        if (sortBy === 'price_low_high') {
+            sortOption = { price: 1 };
+        } else if (sortBy === 'price_high_low') {
+            sortOption = { price: -1 };
+        } else if (sortBy === 'rating') {
+            sortOption = { rating: -1 };
+        }
+
+        // Execute queries
+        const total = await Product.countDocuments(query);
+        const products = await Product.find(query)
+            .populate("category", "name")
+            .populate("retailer", "businessDetails.storeDisplayName name")
+            .sort(sortOption);
+
+        res.status(200).json({
+            success: true,
+            total,
+            data: products
+        });
+    } catch (error) {
+        res.status(500).json({ success: false, message: error.message });
+    }
+};

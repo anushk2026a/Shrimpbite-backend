@@ -21,6 +21,10 @@ import { getPublicCategories } from "../controllers/adminController.js";
 import { getPublicSubscriptionPlans } from "../controllers/subscriptionController.js";
 import { getPublicShops, getShopDetails, getShopProducts } from "../controllers/shopController.js";
 import { addToCart, getCart, clearCart, updateCartItem, removeFromCart } from "../controllers/cartController.js";
+import { getPublicProducts } from "../controllers/productController.js";
+
+// Products (Public with filtering)
+router.get("/products", getPublicProducts);
 
 // Categories (Public for App)
 router.get("/categories", getPublicCategories);
