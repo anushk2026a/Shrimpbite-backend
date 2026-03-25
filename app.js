@@ -27,6 +27,7 @@ const app = express()
 // Middleware
 const allowedOrigins = [
     "http://localhost:3000",
+    "http://16.16.9.58:5000",
     "https://shrimpbite-admin.vercel.app",
     "https://shrimpbite-retailer.vercel.app"
 ];
