@@ -77,6 +77,13 @@ export const sendPushNotification = async (fcmToken, title, body, data = {}) => 
         return { success: true, response };
     } catch (error) {
         console.error(`[Push Notification] Error sending to ${fcmToken}:`, error.message);
+        
+        // Cleanup expired or invalid tokens
+        if (error.code === 'messaging/registration-token-not-registered' || 
+            error.code === 'messaging/invalid-registration-token') {
+            await removeInvalidFCMToken(fcmToken);
+        }
+
         return { success: false, error: error.message };
     }
 };
@@ -109,10 +116,43 @@ export const sendMulticastNotification = async (fcmTokens, title, body, data = {
 
         const response = await admin.messaging().sendEachForMulticast(message);
         console.log(`[Multicast Notification] Sent ${response.successCount} successfully, ${response.failureCount} failed.`);
+
+        // Cleanup expired or invalid tokens
+        if (response.failureCount > 0) {
+            await Promise.all(response.responses.map(async (resp, idx) => {
+                if (!resp.success && resp.error) {
+                    if (resp.error.code === 'messaging/registration-token-not-registered' || 
+                        resp.error.code === 'messaging/invalid-registration-token') {
+                        await removeInvalidFCMToken(uniqueTokens[idx]);
+                    }
+                }
+            }));
+        }
+
         return { success: true, response };
     } catch (error) {
         console.error(`[Multicast Notification] Error:`, error.message);
         return { success: false, error: error.message };
+    }
+};
+
+/**
+ * Removes an invalid FCM token from the database.
+ */
+export const removeInvalidFCMToken = async (fcmToken) => {
+    if (!fcmToken) return;
+    try {
+        const AppUser = (await import("../models/AppUser.js")).default;
+        const User = (await import("../models/User.js")).default;
+
+        await Promise.all([
+            AppUser.updateMany({ fcmToken }, { $unset: { fcmToken: "" } }),
+            User.updateMany({ fcmToken }, { $unset: { fcmToken: "" } })
+        ]);
+        
+        console.log(`[FCM CLEANUP] Removed invalid token: ${fcmToken}`);
+    } catch (err) {
+        console.error(`[FCM CLEANUP ERROR] Failed to remove token ${fcmToken}:`, err.message);
     }
 };
 
