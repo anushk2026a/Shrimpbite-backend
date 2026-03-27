@@ -46,22 +46,7 @@ app.use(cors({
 }));
 
 app.use(express.json())
-// Connect to Database per request (more reliable for Vercel serverless)
-import connectDB from "./config/db.js"
-app.use(async (req, res, next) => {
-    // Skip DB connection for preflight requests to avoid timeouts/CORS errors
-    if (req.method === "OPTIONS") {
-        return next();
-    }
-
-    try {
-        await connectDB();
-        next();
-    } catch (err) {
-        console.error("DB Connection Error:", err.message);
-        res.status(500).json({ success: false, message: "Database connection failed" });
-    }
-});
+// DB is connected once at startup in server.js
 
 app.use("/uploads", express.static(path.join(process.cwd(), "uploads")))
 

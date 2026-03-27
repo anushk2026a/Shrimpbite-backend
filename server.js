@@ -5,22 +5,27 @@ import { initCronJobs } from "./cron.js";
 import { initSocket } from "./services/socketService.js";
 import paymentRoutes from "./routes/paymentRoutes.js";
 
-// Connect DB - Handled by middleware in app.js for serverless compatibility
-// await connectDB()
-
-// Register routes
-app.use("/api/payment", paymentRoutes)
-
-// Start Server
 const PORT = process.env.PORT || 5000
-const server = app.listen(PORT, () => {
-    console.log(`Server running on port ${PORT}`)
-    initCronJobs();
-})
 
-// Init Socket.io
-initSocket(server);
+// Connect DB once at startup, then start server
+const startServer = async () => {
+    try {
+        await connectDB();
+    } catch (err) {
+        console.error("Failed to connect to DB. Exiting.", err.message);
+        process.exit(1);
+    }
 
+    // Register routes
+    app.use("/api/payment", paymentRoutes)
 
-// Export app for Vercel
-export default app;
+    const server = app.listen(PORT, () => {
+        console.log(`Server running on port ${PORT}`)
+        initCronJobs();
+    })
+
+    // Init Socket.io
+    initSocket(server);
+}
+
+startServer();
