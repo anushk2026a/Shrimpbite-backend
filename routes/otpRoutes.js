@@ -137,29 +137,36 @@ router.post("/verify-firebase", async (req, res) => {
             $or: [{ phoneNumber: verifiedPhone }, { phoneNumber: phoneNumber }] 
         });
 
-        if (user) {
+        // AUTO-REGISTER NEW USERS
+        if (!user) {
+            user = await AppUser.create({
+                fullName: "Shrimpbite User", // Placeholder until they update their profile
+                phoneNumber: verifiedPhone || phoneNumber,
+                isVerified: true,
+                // Email is left empty. They can update it later in the profile.
+            });
+        } else {
+            // Existing user
             user.isVerified = true;
             await user.save();
         }
 
         // Generate Shrimpbite JWT
-        let token = null;
-        if (user) {
-            token = jwt.sign({ id: user._id, role: "customer" }, process.env.JWT_SECRET, { expiresIn: "7d" });
-        }
+        const token = jwt.sign({ id: user._id, role: "customer" }, process.env.JWT_SECRET, { expiresIn: "7d" });
 
         return res.status(200).json({
             success: true,
             message: "Firebase Phone verified successfully.",
             isVerified: true,
+            isNewUser: !user.email, // Front-end can use this to encourage profile completion
             token,
-            data: user ? {
+            data: {
                 id: user._id,
                 fullName: user.fullName,
                 email: user.email,
                 phoneNumber: user.phoneNumber,
                 role: "customer"
-            } : null
+            }
         });
 
     } catch (error) {
