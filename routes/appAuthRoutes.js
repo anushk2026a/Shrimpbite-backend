@@ -7,6 +7,7 @@ const router = express.Router();
 import {
     registerUser,
     loginUser,
+    checkUser,
     googleAuth,
     getProfile,
     updateProfile,
@@ -42,6 +43,9 @@ router.post("/register", registerUser);
 
 //login
 router.post("/login", loginUser);
+
+//check user
+router.post("/check-user", checkUser);
 
 //google auth
 router.post("/google", googleAuth);

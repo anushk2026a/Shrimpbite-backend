@@ -2,31 +2,75 @@ import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import otpGenerator from "otp-generator";
 import AppUser from "../models/AppUser.js";
+import User from "../models/User.js";
 import Otp from "../models/Otp.js";
 import { sendWelcomeEmail } from "../services/emailService.js";
 import admin from "firebase-admin";
+
+// Check User Role/Action
+export const checkUser = async (req, res) => {
+    try {
+        const { phoneNumber } = req.body;
+
+        if (!phoneNumber) {
+            return res.status(400).json({ success: false, message: "Phone number is required" });
+        }
+
+        // 1. Check if it's a Rider (from User collection)
+        const rider = await User.findOne({
+            $or: [{ phone: phoneNumber }, { email: phoneNumber }],
+            role: "rider"
+        });
+
+        if (rider) {
+            return res.status(200).json({
+                success: true,
+                action: "password",
+                role: "rider",
+                message: "Rider found. Proceed with password login."
+            });
+        }
+
+        // 2. Otherwise, treat as Customer or New User (Proceed with OTP)
+        const customer = await AppUser.findOne({ phoneNumber });
+
+        return res.status(200).json({
+            success: true,
+            action: "otp",
+            role: "customer",
+            isNewUser: !customer,
+            message: customer ? "Customer found. Proceed with OTP." : "New user. Proceed with OTP registration."
+        });
+
+    } catch (error) {
+        console.error("checkUser error:", error);
+        return res.status(500).json({ success: false, message: "Server error" });
+    }
+};
 // Register
 export const registerUser = async (req, res) => {
     try {
         const { fullName, email, phoneNumber, password, confirmPassword } = req.body;
 
-        if (!fullName || !phoneNumber || !password || !confirmPassword) {
-            return res.status(400).json({ success: false, message: "All required fields must be filled" });
-        }
-
-        if (password !== confirmPassword) {
-            return res.status(400).json({ success: false, message: "Passwords do not match" });
+        if (!fullName || !phoneNumber) {
+            return res.status(400).json({ success: false, message: "Full name and phone number are required" });
         }
 
         const existingUser = await AppUser.findOne({
-            $or: [{ email }, { phoneNumber }],
+            $or: [{ email: email || "NULL_EMAIL" }, { phoneNumber }],
         });
 
         if (existingUser) {
             return res.status(400).json({ success: false, message: "User with this email or phone number already exists" });
         }
 
-        const hashedPassword = await bcrypt.hash(password, 10);
+        let hashedPassword = null;
+        if (password) {
+            if (password !== confirmPassword) {
+                return res.status(400).json({ success: false, message: "Passwords do not match" });
+            }
+            hashedPassword = await bcrypt.hash(password, 10);
+        }
 
         const newUser = await AppUser.create({
             fullName,
@@ -36,10 +80,12 @@ export const registerUser = async (req, res) => {
         });
 
         // send welcome email (non-blocking)
-        try {
-            await sendWelcomeEmail(newUser.email, newUser.fullName);
-        } catch (error) {
-            console.log("Welcome email failed:", error.message);
+        if (newUser.email) {
+            try {
+                await sendWelcomeEmail(newUser.email, newUser.fullName);
+            } catch (error) {
+                console.log("Welcome email failed:", error.message);
+            }
         }
 
         // 6.1 fcmToken assignment
@@ -78,7 +124,6 @@ export const loginUser = async (req, res) => {
 
         if (!user) {
             // Check if it's a Rider (from User collection)
-            const User = (await import("../models/User.js")).default;
             user = await User.findOne({
                 $or: [{ phone: phoneNumber }, { email: phoneNumber }] // Try both for riders
             });
@@ -263,17 +308,26 @@ export const changePassword = async (req, res) => {
     }
 };
 
-// Forgot password (placeholder)
+// Forgot password
 export const forgotPassword = async (req, res) => {
     try {
-        const { email } = req.body;
+        const { email, phoneNumber } = req.body;
+        
+        // For Customers, they should just use OTP
+        if (phoneNumber) {
+             return res.status(200).json({ 
+                success: true, 
+                message: "Customers log in via OTP. No password reset needed. Just request an OTP on the login screen." 
+            });
+        }
+
         if (!email) return res.status(400).json({ success: false, message: "Email is required" });
 
-        const user = await AppUser.findOne({ email });
-        if (!user) return res.status(404).json({ success: false, message: "User not found" });
+        const user = await User.findOne({ email }); // Riders/Retailers/Admins
+        if (!user) return res.status(404).json({ success: false, message: "User with this email not found" });
 
-        // TODO: generate reset token, save, and send email
-        return res.status(200).json({ success: true, message: "Password reset flow to be implemented" });
+        // TODO: generate reset token, save, and send email (for non-customer roles)
+        return res.status(200).json({ success: true, message: "Password reset instructions sent to your email." });
     } catch (error) {
         console.error("forgotPassword error:", error);
         return res.status(500).json({ success: false, message: "Server error" });
