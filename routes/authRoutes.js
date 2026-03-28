@@ -3,8 +3,11 @@ import {
     registerUser,
     loginUser,
     onboardUser,
-    getCurrentUser
+    getCurrentUser,
+    updateRetailerProfile,
+    resetAdminPassword
 } from "../controllers/authController.js";
+import { protect, adminOnly } from "../middleware/authMiddleware.js";
 
 const router = express.Router()
 
@@ -19,5 +22,8 @@ router.put("/onboarding", onboardUser)
 
 // Get Me (Current User)
 router.get("/me/:id", getCurrentUser)
+
+// Reset Admin Password
+router.post("/reset-admin-password", protect, adminOnly, resetAdminPassword)
 
 export default router

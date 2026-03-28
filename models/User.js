@@ -20,6 +20,14 @@ const userSchema = new mongoose.Schema({
         enum: ["admin", "retailer", "rider"],
         default: "retailer"
     },
+    adminRole: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "Role"
+    },
+    isPasswordResetRequired: {
+        type: Boolean,
+        default: false
+    },
     walletBalance: { type: Number, default: 0 },
     isShopActive: { type: Boolean, default: true },
     phone: {

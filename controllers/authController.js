@@ -47,7 +47,7 @@ export const loginUser = async (req, res) => {
         // Special handling for test accounts
         if (email === "admin@test.com" && password === "123456") {
             const token = jwt.sign({ id: "admin-test-id", role: "admin" }, process.env.JWT_SECRET, { expiresIn: "11d" })
-            return res.status(200).json({ token, user: { id: "admin-test-id", name: "Admin Test", email, role: "admin", status: "approved" } })
+            return res.status(200).json({ token, user: { id: "admin-test-id", name: "Admin Test", email, role: "admin", status: "approved", isPasswordResetRequired: false, adminRole: null } })
         }
 
         if (email === "retailer@test.com" && password === "123456") {
@@ -55,7 +55,7 @@ export const loginUser = async (req, res) => {
             return res.status(200).json({ token, user: { id: "retailer-test-id", name: "Retailer Test", email, role: "retailer", status: "approved" } })
         }
 
-        const user = await User.findOne({ email })
+        const user = await User.findOne({ email }).populate("adminRole", "name modules")
         if (!user) return res.status(404).json({ message: "User doesn't exist" })
 
         const isPasswordCorrect = await bcrypt.compare(password, user.password)
@@ -77,7 +77,9 @@ export const loginUser = async (req, res) => {
                 email,
                 status: user.status,
                 role: user.role,
-                isShopActive: user.isShopActive
+                isShopActive: user.isShopActive,
+                adminRole: user.adminRole,
+                isPasswordResetRequired: user.isPasswordResetRequired || false
             }
         })
     } catch (error) {
@@ -140,7 +142,7 @@ export const getCurrentUser = async (req, res) => {
             })
         }
 
-        const user = await User.findById(req.params.id)
+        const user = await User.findById(req.params.id).populate("adminRole", "name modules")
         if (!user) return res.status(404).json({ message: "User not found" })
 
         res.status(200).json(user)
@@ -184,3 +186,28 @@ export const updateRetailerProfile = async (req, res) => {
         res.status(500).json({ message: error.message || "Something went wrong" });
     }
 };
+
+// Reset Admin Password (for mandatory first login flow)
+export const resetAdminPassword = async (req, res) => {
+    try {
+        const { currentPassword, newPassword } = req.body;
+        
+        const user = await User.findById(req.user.id);
+        if (!user) return res.status(404).json({ message: "User not found" });
+
+        const isPasswordCorrect = await bcrypt.compare(currentPassword, user.password);
+        if (!isPasswordCorrect) return res.status(400).json({ message: "Invalid current password" });
+
+        const hashedPassword = await bcrypt.hash(newPassword, 12);
+        
+        user.password = hashedPassword;
+        user.isPasswordResetRequired = false;
+        await user.save();
+
+        res.status(200).json({ success: true, message: "Password updated successfully" });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: error.message || "Something went wrong" });
+    }
+};
+

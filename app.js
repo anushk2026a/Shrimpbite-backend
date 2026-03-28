@@ -21,8 +21,9 @@ import cronRoutes from "./routes/cronRoutes.js";
 import favoriteRoutes from "./routes/favoriteRoutes.js";
 import notificationRoutes from "./routes/notificationRoutes.js";
 import searchRoutes from "./routes/searchRoutes.js";
-const app = express()
+import roleRoutes from "./routes/roleRoutes.js";
 
+const app = express()
 
 // Middleware
 const allowedOrigins = [
@@ -72,6 +73,7 @@ app.use("/api/cron", cronRoutes);
 app.use("/api/notifications", notificationRoutes);
 app.use("/api/app/favorites", favoriteRoutes);
 app.use("/api/app/search", searchRoutes);
+app.use("/api/roles", roleRoutes);
 
 // Basic test route
 app.get("/", (req, res) => {
