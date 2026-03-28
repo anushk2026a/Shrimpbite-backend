@@ -61,7 +61,7 @@ export const getIO = () => {
 export const emitOrderUpdate = async (orderId, status, data, retailerId = null, userId = null, riderId = null) => {
     // 1. Determine all possible order rooms
     const rooms = [`order_${orderId}`, "admin"];
-    
+
     // Add Mongo ID room if available (handles cases where client joins using database ID)
     const mongoId = data?._id || data?.order?._id;
     if (mongoId && mongoId.toString() !== orderId.toString()) {
@@ -73,7 +73,7 @@ export const emitOrderUpdate = async (orderId, status, data, retailerId = null, 
     if (riderId) rooms.push(`rider_${riderId.toString()}`);
 
     const payload = { status, data, orderId };
-    
+
     // 1. Local emit - DO THIS FIRST to ensure immediate local feedback
     if (io) {
         _log(`Emitting locally to ${rooms.length} rooms`, { status: "INFO", data: rooms });
@@ -84,23 +84,23 @@ export const emitOrderUpdate = async (orderId, status, data, retailerId = null, 
 
     // 2. Relay emit (for Vercel/External Dashboards)
     // We do NOT await this anymore to keep the API responsive
-    const relayUrl = process.env.SOCKET_RELAY_URL;
-    if (relayUrl) {
-        Promise.all(rooms.map(room => 
-            fetch(`${relayUrl}/emit`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    secret: process.env.SOCKET_SECRET || "shrimpbite_socket_relay_secret_2026",
-                    event: "orderUpdate",
-                    room: room,
-                    data: payload
-                })
-            })
-        )).catch(error => {
-            console.error("Relay emit background failed:", error.message);
-        });
-    }
+    // const relayUrl = process.env.SOCKET_RELAY_URL;
+    // if (relayUrl) {
+    //     Promise.all(rooms.map(room => 
+    //         fetch(`${relayUrl}/emit`, {
+    //             method: "POST",
+    //             headers: { "Content-Type": "application/json" },
+    //             body: JSON.stringify({
+    //                 secret: process.env.SOCKET_SECRET || "shrimpbite_socket_relay_secret_2026",
+    //                 event: "orderUpdate",
+    //                 room: room,
+    //                 data: payload
+    //             })
+    //         })
+    //     )).catch(error => {
+    //         console.error("Relay emit background failed:", error.message);
+    //     });
+    // }
 };
 
 // Emit rider assignment to the user — triggers popup + sound in user app
@@ -114,23 +114,23 @@ export const emitRiderAssigned = async (orderId, userId, riderInfo) => {
         io.to(room).emit("riderAssigned", payload);
     }
 
-    const relayUrl = process.env.SOCKET_RELAY_URL;
-    if (relayUrl) {
-        try {
-            await fetch(`${relayUrl}/emit`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    secret: process.env.SOCKET_SECRET || "shrimpbite_socket_relay_secret_2026",
-                    event: "riderAssigned",
-                    room: room,
-                    data: payload
-                })
-            });
-        } catch (error) {
-            console.error("Relay riderAssigned emit failed:", error.message);
-        }
-    }
+    // const relayUrl = process.env.SOCKET_RELAY_URL;
+    // if (relayUrl) {
+    //     try {
+    //         await fetch(`${relayUrl}/emit`, {
+    //             method: "POST",
+    //             headers: { "Content-Type": "application/json" },
+    //             body: JSON.stringify({
+    //                 secret: process.env.SOCKET_SECRET || "shrimpbite_socket_relay_secret_2026",
+    //                 event: "riderAssigned",
+    //                 room: room,
+    //                 data: payload
+    //             })
+    //         });
+    //     } catch (error) {
+    //         console.error("Relay riderAssigned emit failed:", error.message);
+    //     }
+    // }
 };
 
 export const emitChatUpdate = async (chatId, message) => {
@@ -141,23 +141,23 @@ export const emitChatUpdate = async (chatId, message) => {
     }
 
     // 2. Try relay emit (for Vercel)
-    const relayUrl = process.env.SOCKET_RELAY_URL;
-    if (relayUrl) {
-        try {
-            await fetch(`${relayUrl}/emit`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    secret: process.env.SOCKET_SECRET || "shrimpbite_socket_relay_secret_2026",
-                    event: "newMessage",
-                    room: room,
-                    data: message
-                })
-            });
-        } catch (error) {
-            console.error("Relay chat emit failed:", error.message);
-        }
-    }
+    // const relayUrl = process.env.SOCKET_RELAY_URL;
+    // if (relayUrl) {
+    //     try {
+    //         await fetch(`${relayUrl}/emit`, {
+    //             method: "POST",
+    //             headers: { "Content-Type": "application/json" },
+    //             body: JSON.stringify({
+    //                 secret: process.env.SOCKET_SECRET || "shrimpbite_socket_relay_secret_2026",
+    //                 event: "newMessage",
+    //                 room: room,
+    //                 data: message
+    //             })
+    //         });
+    //     } catch (error) {
+    //         console.error("Relay chat emit failed:", error.message);
+    //     }
+    // }
 };
 
 export const emitNotification = async (recipientId, notification) => {
@@ -170,23 +170,23 @@ export const emitNotification = async (recipientId, notification) => {
         io.to(room).emit("notification", payload);
     }
 
-    const relayUrl = process.env.SOCKET_RELAY_URL;
-    if (relayUrl) {
-        try {
-            await fetch(`${relayUrl}/emit`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    secret: process.env.SOCKET_SECRET || "shrimpbite_socket_relay_secret_2026",
-                    event: "notification",
-                    room: room,
-                    data: payload
-                })
-            });
-        } catch (error) {
-            console.error("Relay notification emit failed:", error.message);
-        }
-    }
+    // const relayUrl = process.env.SOCKET_RELAY_URL;
+    // if (relayUrl) {
+    //     try {
+    //         await fetch(`${relayUrl}/emit`, {
+    //             method: "POST",
+    //             headers: { "Content-Type": "application/json" },
+    //             body: JSON.stringify({
+    //                 secret: process.env.SOCKET_SECRET || "shrimpbite_socket_relay_secret_2026",
+    //                 event: "notification",
+    //                 room: room,
+    //                 data: payload
+    //             })
+    //         });
+    //     } catch (error) {
+    //         console.error("Relay notification emit failed:", error.message);
+    //     }
+    // }
 };
 
 
@@ -200,23 +200,23 @@ export const emitOrderDelivered = async (orderId, userId, orderData) => {
         io.to(room).emit("orderDelivered", payload);
     }
 
-    const relayUrl = process.env.SOCKET_RELAY_URL;
-    if (relayUrl) {
-        try {
-            await fetch(`${relayUrl}/emit`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    secret: process.env.SOCKET_SECRET || "shrimpbite_socket_relay_secret_2026",
-                    event: "orderDelivered",
-                    room: room,
-                    data: payload
-                })
-            });
-        } catch (error) {
-            console.error("Relay orderDelivered emit failed:", error.message);
-        }
-    }
+    // const relayUrl = process.env.SOCKET_RELAY_URL;
+    // if (relayUrl) {
+    //     try {
+    //         await fetch(`${relayUrl}/emit`, {
+    //             method: "POST",
+    //             headers: { "Content-Type": "application/json" },
+    //             body: JSON.stringify({
+    //                 secret: process.env.SOCKET_SECRET || "shrimpbite_socket_relay_secret_2026",
+    //                 event: "orderDelivered",
+    //                 room: room,
+    //                 data: payload
+    //             })
+    //         });
+    //     } catch (error) {
+    //         console.error("Relay orderDelivered emit failed:", error.message);
+    //     }
+    // }
 };
 
 export const emitShopStatusUpdate = (shopId, isShopActive) => {
@@ -228,17 +228,17 @@ export const emitShopStatusUpdate = (shopId, isShopActive) => {
     }
 
     // Relay for Vercel if needed
-    const relayUrl = process.env.SOCKET_RELAY_URL;
-    if (relayUrl) {
-        fetch(`${relayUrl}/emit`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-                secret: process.env.SOCKET_SECRET || "shrimpbite_socket_relay_secret_2026",
-                event: "shopStatusUpdate",
-                broadcast: true,
-                data: payload
-            })
-        }).catch(err => console.error("Relay shop status update failed:", err.message));
-    }
+    // const relayUrl = process.env.SOCKET_RELAY_URL;
+    // if (relayUrl) {
+    //     fetch(`${relayUrl}/emit`, {
+    //         method: "POST",
+    //         headers: { "Content-Type": "application/json" },
+    //         body: JSON.stringify({
+    //             secret: process.env.SOCKET_SECRET || "shrimpbite_socket_relay_secret_2026",
+    //             event: "shopStatusUpdate",
+    //             broadcast: true,
+    //             data: payload
+    //         })
+    //     }).catch(err => console.error("Relay shop status update failed:", err.message));
+    // }
 };
