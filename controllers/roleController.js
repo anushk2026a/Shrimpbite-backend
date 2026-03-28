@@ -74,15 +74,15 @@ export const updateRole = async (req, res) => {
 // @access  Private/Admin
 export const inviteAdmin = async (req, res) => {
     try {
-        const { name, email, phone, roleId } = req.body;
+        const { name, email, roleId } = req.body;
 
-        if (!name || !email || !roleId || !phone) {
-            return res.status(400).json({ success: false, message: "Name, email, phone, and role are required." });
+        if (!name || !email || !roleId) {
+            return res.status(400).json({ success: false, message: "Name, email, and role are required." });
         }
 
-        const userExists = await User.findOne({ $or: [{ email }, { phone }] });
+        const userExists = await User.findOne({ email });
         if (userExists) {
-            return res.status(400).json({ success: false, message: "User with this email or phone already exists." });
+            return res.status(400).json({ success: false, message: "User with this email already exists." });
         }
 
         const role = await Role.findById(roleId);
@@ -99,7 +99,6 @@ export const inviteAdmin = async (req, res) => {
         const newUser = await User.create({
             name,
             email,
-            phone,
             password: hashedPassword,
             role: "admin",
             adminRole: roleId,

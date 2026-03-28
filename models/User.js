@@ -32,7 +32,7 @@ const userSchema = new mongoose.Schema({
     isShopActive: { type: Boolean, default: true },
     phone: {
         type: String,
-        required: true,
+        required: function() { return this.role !== "admin"; },
         unique: true,
         sparse: true
     },
