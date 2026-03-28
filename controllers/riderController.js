@@ -197,18 +197,15 @@ export const completeDelivery = async (req, res) => {
 
 export const addRider = async (req, res) => {
     try {
-        const { name, email, password, phone, vehicleType, plateNumber } = req.body;
+        const { name, phone, vehicleType, plateNumber } = req.body;
         const retailerId = req.user.id;
 
-        const existingUser = await User.findOne({ email });
-        if (existingUser) return res.status(400).json({ success: false, message: "A user with this email already exists" });
+        const existingUser = await User.findOne({ phone });
+        if (existingUser) return res.status(400).json({ success: false, message: "A user with this phone number already exists" });
 
         // Create User account
-        const hashedPassword = await bcrypt.hash(password, 12);
         const user = new User({
             name,
-            email,
-            password: hashedPassword,
             phone,
             role: "rider",
             status: "approved"

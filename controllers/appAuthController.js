@@ -25,9 +25,9 @@ export const checkUser = async (req, res) => {
         if (rider) {
             return res.status(200).json({
                 success: true,
-                action: "password",
+                action: "otp",
                 role: "rider",
-                message: "Rider found. Proceed with password login."
+                message: "Rider found. Proceed with OTP login."
             });
         }
 

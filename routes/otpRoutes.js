@@ -2,6 +2,7 @@ import express from "express";
 import otpGenerator from "otp-generator";
 import jwt from "jsonwebtoken";
 import AppUser from "../models/AppUser.js";
+import User from "../models/User.js"; // Added User model import
 import Otp from "../models/Otp.js";
 
 const router = express.Router();
@@ -67,35 +68,52 @@ router.post("/verify", async (req, res) => {
             return res.status(400).json({ success: false, message: "OTP expired" });
         }
 
-        // OTP is valid!
-        // Mark user as verified
-        const user = await AppUser.findOneAndUpdate(
-            { phoneNumber },
-            { isVerified: true },
-            { new: true }
-        );
+        // --- TIERED ROLE CHECK ---
+        let user = null;
+        let role = "customer";
+
+        // 1. Check if it's a Rider
+        user = await User.findOne({ phone: phoneNumber, role: "rider" });
+        if (user) {
+            role = "rider";
+        } else {
+            // 2. Check if it's an existing Customer
+            user = await AppUser.findOne({ phoneNumber });
+            if (!user) {
+                // 3. Auto-register as new Customer
+                user = await AppUser.create({
+                    fullName: "Shrimpbite User",
+                    phoneNumber: phoneNumber,
+                    isVerified: true
+                });
+            }
+        }
+
+        // Mark user as verified if they exist
+        if (user) {
+            user.isVerified = true;
+            await user.save();
+        }
 
         // Delete OTP after successful verification
         await Otp.deleteOne({ phoneNumber });
 
-        // Generate token for auto-login
-        let token = null;
-        if (user) {
-            token = jwt.sign({ id: user._id, role: "customer" }, process.env.JWT_SECRET, { expiresIn: "7d" });
-        }
+        // Generate token
+        const token = jwt.sign({ id: user._id, role }, process.env.JWT_SECRET, { expiresIn: "7d" });
 
         return res.status(200).json({
             success: true,
-            message: "OTP verified successfully. User is now verified.",
-            isVerified: user ? user.isVerified : false,
+            message: "OTP verified successfully.",
+            isVerified: true,
+            role,
             token,
-            data: user ? {
+            data: {
                 id: user._id,
-                fullName: user.fullName,
+                fullName: user.fullName || user.name,
                 email: user.email,
-                phoneNumber: user.phoneNumber,
-                role: "customer"
-            } : null
+                phoneNumber: user.phoneNumber || user.phone,
+                role
+            }
         });
     } catch (error) {
         console.error("otp verify error:", error);
@@ -123,49 +141,53 @@ router.post("/verify-firebase", async (req, res) => {
             return res.status(401).json({ success: false, message: "Invalid or expired Firebase token" });
         }
 
-        // The phone_number in the token should match or we use it directly
         const verifiedPhone = decodedToken.phone_number;
-        
         if (!verifiedPhone) {
             return res.status(400).json({ success: false, message: "Phone number not found in Firebase token" });
         }
 
-        // Phone numbers from Firebase usually include +xx, ensure consistency
-        // In this project, phone numbers are stored as typed by user, usually including country code in some cases.
-        // We find by exact match or normalized. For now, exact match with verified phone.
-        let user = await AppUser.findOne({ 
-            $or: [{ phoneNumber: verifiedPhone }, { phoneNumber: phoneNumber }] 
-        });
+        const searchPhone = verifiedPhone || phoneNumber;
 
-        // AUTO-REGISTER NEW USERS
-        if (!user) {
-            user = await AppUser.create({
-                fullName: "Shrimpbite User", // Placeholder until they update their profile
-                phoneNumber: verifiedPhone || phoneNumber,
-                isVerified: true,
-                // Email is left empty. They can update it later in the profile.
-            });
+        // --- TIERED ROLE CHECK ---
+        let user = null;
+        let role = "customer";
+
+        // 1. Check if it's a Rider
+        user = await User.findOne({ phone: searchPhone, role: "rider" });
+        if (user) {
+            role = "rider";
         } else {
-            // Existing user
-            user.isVerified = true;
-            await user.save();
+            // 2. Check if it's an existing Customer
+            user = await AppUser.findOne({ phoneNumber: searchPhone });
+            if (!user) {
+                // 3. Auto-register as new Customer
+                user = await AppUser.create({
+                    fullName: "Shrimpbite User",
+                    phoneNumber: searchPhone,
+                    isVerified: true
+                });
+            }
         }
 
-        // Generate Shrimpbite JWT
-        const token = jwt.sign({ id: user._id, role: "customer" }, process.env.JWT_SECRET, { expiresIn: "7d" });
+        // Update verification status
+        user.isVerified = true;
+        await user.save();
+
+        // Generate token
+        const token = jwt.sign({ id: user._id, role }, process.env.JWT_SECRET, { expiresIn: "7d" });
 
         return res.status(200).json({
             success: true,
             message: "Firebase Phone verified successfully.",
             isVerified: true,
-            isNewUser: !user.email, // Front-end can use this to encourage profile completion
+            role,
             token,
             data: {
                 id: user._id,
-                fullName: user.fullName,
+                fullName: user.fullName || user.name,
                 email: user.email,
-                phoneNumber: user.phoneNumber,
-                role: "customer"
+                phoneNumber: user.phoneNumber || user.phone,
+                role
             }
         });
 
@@ -175,4 +197,4 @@ router.post("/verify-firebase", async (req, res) => {
     }
 });
 
-export default router;
+export default router;

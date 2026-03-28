@@ -7,12 +7,13 @@ const userSchema = new mongoose.Schema({
     },
     email: {
         type: String,
-        required: true,
-        unique: true
+        required: false,
+        unique: true,
+        sparse: true
     },
     password: {
         type: String,
-        required: true
+        required: false
     },
     role: {
         type: String,
@@ -23,7 +24,9 @@ const userSchema = new mongoose.Schema({
     isShopActive: { type: Boolean, default: true },
     phone: {
         type: String,
-        required: false
+        required: true,
+        unique: true,
+        sparse: true
     },
     alternateContact: String,
     whatsappNumber: String,
