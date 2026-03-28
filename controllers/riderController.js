@@ -3,6 +3,7 @@ import Order from "../models/Order.js";
 import RiderModel from "../models/Rider.js";
 import bcrypt from "bcryptjs";
 import { emitOrderUpdate, emitRiderAssigned, emitOrderDelivered } from "../services/socketService.js";
+import { normalizePhoneNumber } from "../utils/phoneUtils.js";
 
 import { createNotification } from "../services/notificationService.js";
 
@@ -197,9 +198,10 @@ export const completeDelivery = async (req, res) => {
 
 export const addRider = async (req, res) => {
     try {
-        const { name, phone, vehicleType, plateNumber } = req.body;
+        let { name, phone, vehicleType, plateNumber } = req.body;
         const retailerId = req.user.id;
 
+        phone = normalizePhoneNumber(phone);
         const existingUser = await User.findOne({ phone });
         if (existingUser) return res.status(400).json({ success: false, message: "A user with this phone number already exists" });
 
@@ -314,9 +316,11 @@ export const respondToOrderAssignment = async (req, res) => {
 };
 export const updateRider = async (req, res) => {
     try {
-        const { name, phone, vehicleType, plateNumber } = req.body;
+        let { name, phone, vehicleType, plateNumber } = req.body;
         const riderId = req.params.id;
         const retailerId = req.user.id;
+
+        if (phone) phone = normalizePhoneNumber(phone);
 
         const rider = await RiderModel.findOne({ _id: riderId, retailer: retailerId });
         if (!rider) return res.status(404).json({ success: false, message: "Rider not found or unauthorized" });

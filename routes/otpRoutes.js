@@ -4,14 +4,17 @@ import jwt from "jsonwebtoken";
 import AppUser from "../models/AppUser.js";
 import User from "../models/User.js"; // Added User model import
 import Otp from "../models/Otp.js";
+import { normalizePhoneNumber } from "../utils/phoneUtils.js";
 
 const router = express.Router();
 
 // send otp
 router.post("/send", async (req, res) => {
     try {
-        const { phoneNumber } = req.body;
+        let { phoneNumber } = req.body;
         if (!phoneNumber) return res.status(400).json({ success: false, message: "Phone number is required" });
+
+        phoneNumber = normalizePhoneNumber(phoneNumber);
 
         // Generate 6 digit OTP
         const otpCode = otpGenerator.generate(6, {
@@ -48,11 +51,13 @@ router.post("/send", async (req, res) => {
 // verify otp
 router.post("/verify", async (req, res) => {
     try {
-        const { phoneNumber, otp } = req.body;
+        let { phoneNumber, otp } = req.body;
 
         if (!phoneNumber || !otp) {
             return res.status(400).json({ success: false, message: "Phone number and OTP are required" });
         }
+
+        phoneNumber = normalizePhoneNumber(phoneNumber);
 
         const otpRecord = await Otp.findOne({ phoneNumber });
 
@@ -142,11 +147,11 @@ router.post("/verify-firebase", async (req, res) => {
         }
 
         const verifiedPhone = decodedToken.phone_number;
-        if (!verifiedPhone) {
-            return res.status(400).json({ success: false, message: "Phone number not found in Firebase token" });
+        if (!verifiedPhone && !phoneNumber) {
+            return res.status(400).json({ success: false, message: "Phone number not found in Firebase token or request" });
         }
 
-        const searchPhone = verifiedPhone || phoneNumber;
+        const searchPhone = normalizePhoneNumber(verifiedPhone || phoneNumber);
 
         // --- TIERED ROLE CHECK ---
         let user = null;

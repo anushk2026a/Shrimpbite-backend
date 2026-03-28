@@ -6,15 +6,18 @@ import User from "../models/User.js";
 import Otp from "../models/Otp.js";
 import { sendWelcomeEmail } from "../services/emailService.js";
 import admin from "firebase-admin";
+import { normalizePhoneNumber } from "../utils/phoneUtils.js";
 
 // Check User Role/Action
 export const checkUser = async (req, res) => {
     try {
-        const { phoneNumber } = req.body;
+        let { phoneNumber } = req.body;
 
         if (!phoneNumber) {
             return res.status(400).json({ success: false, message: "Phone number is required" });
         }
+
+        phoneNumber = normalizePhoneNumber(phoneNumber);
 
         // 1. Check if it's a Rider (from User collection)
         const rider = await User.findOne({
@@ -50,11 +53,13 @@ export const checkUser = async (req, res) => {
 // Register
 export const registerUser = async (req, res) => {
     try {
-        const { fullName, email, phoneNumber, password, confirmPassword } = req.body;
+        let { fullName, email, phoneNumber, password, confirmPassword } = req.body;
 
         if (!fullName || !phoneNumber) {
             return res.status(400).json({ success: false, message: "Full name and phone number are required" });
         }
+
+        phoneNumber = normalizePhoneNumber(phoneNumber);
 
         const existingUser = await AppUser.findOne({
             $or: [{ email: email || "NULL_EMAIL" }, { phoneNumber }],
@@ -113,11 +118,13 @@ export const registerUser = async (req, res) => {
 // Login
 export const loginUser = async (req, res) => {
     try {
-        const { phoneNumber, password, fcmToken } = req.body;
+        let { phoneNumber, password, fcmToken } = req.body;
 
         if (!phoneNumber || !password) {
             return res.status(400).json({ success: false, message: "Phone number and password required" });
         }
+
+        phoneNumber = normalizePhoneNumber(phoneNumber);
 
         let user = await AppUser.findOne({ phoneNumber });
         let role = "customer";
@@ -223,12 +230,13 @@ export const updateProfile = async (req, res) => {
 
         // phone
         if (phoneNumber) {
-            if (phoneNumber === user.phoneNumber) {
+            const normalizedPhone = normalizePhoneNumber(phoneNumber);
+            if (normalizedPhone === user.phoneNumber) {
                 return res.status(400).json({ success: false, message: "Phone number is same as previous" });
             }
-            const phoneExists = await AppUser.findOne({ phoneNumber });
+            const phoneExists = await AppUser.findOne({ phoneNumber: normalizedPhone });
             if (phoneExists) return res.status(400).json({ success: false, message: "Phone number already in use" });
-            user.phoneNumber = phoneNumber;
+            user.phoneNumber = normalizedPhone;
             updates.push("phoneNumber");
         }
 
