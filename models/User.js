@@ -51,16 +51,9 @@ const userSchema = new mongoose.Schema({
         businessName: String,
         storeDisplayName: String,
         ownerName: String,
-        businessType: {
-            type: String,
-            enum: ["Seafood Retail Store", "Frozen Products Store", "Supermarket", "Kirana Store", "Distributor"]
-        },
+        businessType: String,
         yearsInBusiness: String,
-        coldStorage: {
-            type: String,
-            enum: ["Yes", "No"],
-            default: "No"
-        },
+        coldStorage: String,
         monthlyPurchaseVolume: String,
         location: {
             address: String,
