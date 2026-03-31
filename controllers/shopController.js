@@ -771,6 +771,14 @@ export const assignRiderToOrder = async (req, res) => {
         order.rider = riderId;
         order.riderAssignmentStatus = "Pending";
         order.status = "Rider Assigned"; // Sync main order status
+
+        // Sync individual item statuses for this retailer
+        order.items.forEach(item => {
+            if (item.retailer && item.retailer.toString() === retailerId.toString()) {
+                item.status = "Rider Assigned";
+            }
+        });
+
         await order.save();
 
         // Emit real-time update to retailer and rider
