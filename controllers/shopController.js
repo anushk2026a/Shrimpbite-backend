@@ -727,14 +727,13 @@ export const getRetailerReviews = async (req, res) => {
                 if (o.overallExperience.rating >= 4) positive++;
                 count++;
             }
+            
+            // Factor in every product rating into the weight
             o.productRatings.forEach(pr => {
                 totalVal += pr.rating;
-                // We factor in product ratings into stats if overall is missing
-                if (!o.overallExperience) {
-                    distribution[pr.rating]++;
-                    if (pr.rating >= 4) positive++;
-                    count++;
-                }
+                distribution[pr.rating]++;
+                if (pr.rating >= 4) positive++;
+                count++;
             });
         });
 
