@@ -41,6 +41,7 @@ export const getDailyPrepList = async (retailerId, dateString) => {
                 orderCount: 0,
                 subscriptionCount: 0,
                 oneTimeCount: 0,
+                processedCount: 0,
                 status: "Pending"
             };
         }
@@ -48,6 +49,12 @@ export const getDailyPrepList = async (retailerId, dateString) => {
         requirements[prodId].orderCount += 1;
         if (type === "Subscription") requirements[prodId].subscriptionCount += 1;
         else requirements[prodId].oneTimeCount += 1;
+
+        // Count as processed if it has a rider assigned or is further in the lifecycle
+        const processedStatuses = ["Rider Assigned", "Rider Accepted", "Shipped", "Out for Delivery", "Delivered", "Completed"];
+        if (processedStatuses.includes(item.status)) {
+            requirements[prodId].processedCount += 1;
+        }
     };
 
     subscriptionOrders.forEach(order => {
