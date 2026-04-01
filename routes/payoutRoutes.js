@@ -3,6 +3,7 @@ import {
     requestPayout,
     getPayoutHistory,
     approvePayout,
+    rejectPayout,
     getAllPayouts
 } from "../controllers/payoutController.js";
 import { protect, adminOnly } from "../middleware/authMiddleware.js";
@@ -16,5 +17,6 @@ router.get("/my-history", protect, getPayoutHistory);
 // Admin Routes
 router.get("/all", protect, adminOnly, getAllPayouts);
 router.put("/approve/:payoutId", protect, adminOnly, approvePayout);
+router.put("/reject/:payoutId", protect, adminOnly, rejectPayout);
 
 export default router;

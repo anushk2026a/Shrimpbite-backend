@@ -85,6 +85,42 @@ export const approvePayout = async (req, res) => {
         res.status(500).json({ message: error.message });
     }
 };
+
+export const rejectPayout = async (req, res) => {
+    try {
+        const { payoutId } = req.params;
+        const { adminComment } = req.body;
+
+        const payout = await Payout.findById(payoutId);
+        if (!payout) return res.status(404).json({ message: "Payout not found" });
+
+        payout.status = 'Rejected';
+        payout.adminComment = adminComment;
+        payout.processedAt = Date.now();
+
+        await payout.save();
+
+        // Notify Retailer about rejected payout
+        try {
+            const { createNotification } = await import("../services/notificationService.js");
+            await createNotification(payout.retailer.toString(), {
+                title: "Payout Request Rejected ❌",
+                message: `Your payout request for ₹${payout.amount} has been rejected. You can request again or contact admin for details.`,
+                type: "System",
+                referenceId: payout._id.toString()
+            });
+        } catch (err) {
+            console.error("Retailer payout rejection notification error:", err.message);
+        }
+
+        // Real-time socket update for admin table
+        emitPayoutUpdate(payout);
+
+        res.json({ message: "Payout rejected", payout });
+    } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+};
 export const getAllPayouts = async (req, res) => {
     try {
         const payouts = await Payout.find().populate('retailer', 'name email businessDetails').sort({ createdAt: -1 });
