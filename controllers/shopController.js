@@ -810,7 +810,7 @@ export const assignRiderToOrder = async (req, res) => {
 
 export const getBankAccounts = async (req, res) => {
     try {
-        const user = await User.findById(req.user.id).select("bankAccounts");
+        const user = await User.findById(req.userId).select("bankAccounts");
         res.status(200).json({ success: true, bankAccounts: user.bankAccounts || [] });
     } catch (error) {
         res.status(500).json({ success: false, message: error.message });
@@ -829,7 +829,7 @@ export const addBankAccount = async (req, res) => {
             return res.status(400).json({ success: false, message: "Invalid IFSC Code format. Must be 11 characters, first 4 letters, 5th is '0', last 6 alphanumeric." });
         }
 
-        const user = await User.findById(req.user.id);
+        const user = await User.findById(req.userId);
         const newBank = {
             bankName,
             accountNumber,
@@ -850,14 +850,28 @@ export const addBankAccount = async (req, res) => {
 export const deleteBankAccount = async (req, res) => {
     try {
         const { bankId } = req.params;
-        const user = await User.findById(req.user.id);
+        console.log(`[BANK_DELETE] Attempting to delete bank ${bankId} for user ${req.userId}`);
         
-        // Delete by filtering out the matching bank ID
-        user.bankAccounts = user.bankAccounts.filter(b => b._id.toString() !== bankId);
+        const user = await User.findById(req.userId);
+        
+        if (!user) {
+            return res.status(404).json({ success: false, message: "User not found" });
+        }
+
+        // Find and remove the subdocument
+        const bank = user.bankAccounts.id(bankId);
+        if (!bank) {
+            console.log(`[BANK_DELETE] Bank ${bankId} not found in user's accounts`);
+            return res.status(404).json({ success: false, message: "Bank account not found" });
+        }
+
+        bank.remove();
         await user.save();
 
+        console.log(`[BANK_DELETE] Successfully deleted bank ${bankId}`);
         res.status(200).json({ success: true, message: "Bank account deleted successfully", bankAccounts: user.bankAccounts });
     } catch (error) {
+        console.error(`[BANK_DELETE] Error deleting bank ${bankId}:`, error);
         res.status(500).json({ success: false, message: error.message });
     }
 };

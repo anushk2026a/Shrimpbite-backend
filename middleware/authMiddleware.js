@@ -14,10 +14,12 @@ export const protect = async (req, res, next) => {
         // Handle test accounts
         if (token.startsWith("admin-test-id")) {
             req.user = { _id: "admin-test-id", role: "admin" };
+            req.userId = "admin-test-id";
             return next();
         }
         if (token.startsWith("retailer-test-id")) {
             req.user = { _id: "retailer-test-id", role: "retailer" };
+            req.userId = "retailer-test-id";
             return next();
         }
 
