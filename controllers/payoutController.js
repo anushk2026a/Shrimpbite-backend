@@ -59,6 +59,20 @@ export const approvePayout = async (req, res) => {
         payout.processedAt = Date.now();
 
         await payout.save();
+
+        // Notify Retailer about approved payout
+        try {
+            const { createNotification } = await import("../services/notificationService.js");
+            createNotification(payout.retailer.toString(), {
+                title: "Payout Approved! 🎉",
+                message: `Your payout request for ₹${payout.amount} has been approved and processed.`,
+                type: "System",
+                referenceId: payout._id.toString()
+            });
+        } catch (err) {
+            console.error("Retailer payout notification error:", err.message);
+        }
+
         res.json({ message: "Payout approved", payout });
     } catch (error) {
         res.status(500).json({ message: error.message });
