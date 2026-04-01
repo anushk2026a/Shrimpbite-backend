@@ -106,7 +106,7 @@ export const rejectPayout = async (req, res) => {
             await createNotification(payout.retailer.toString(), {
                 title: "Payout Request Rejected ❌",
                 message: `Your payout request for ₹${payout.amount} has been rejected. You can request again or contact admin for details.`,
-                type: "System",
+                type: "Warning",
                 referenceId: payout._id.toString()
             });
         } catch (err) {
