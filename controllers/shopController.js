@@ -848,8 +848,8 @@ export const addBankAccount = async (req, res) => {
 };
 
 export const deleteBankAccount = async (req, res) => {
+    const { bankId } = req.params;
     try {
-        const { bankId } = req.params;
         console.log(`[BANK_DELETE] Attempting to delete bank ${bankId} for user ${req.userId}`);
         
         const user = await User.findById(req.userId);
@@ -858,14 +858,8 @@ export const deleteBankAccount = async (req, res) => {
             return res.status(404).json({ success: false, message: "User not found" });
         }
 
-        // Find and remove the subdocument
-        const bank = user.bankAccounts.id(bankId);
-        if (!bank) {
-            console.log(`[BANK_DELETE] Bank ${bankId} not found in user's accounts`);
-            return res.status(404).json({ success: false, message: "Bank account not found" });
-        }
-
-        bank.remove();
+        // Pull the bank account by ID - the most robust method in Mongoose
+        user.bankAccounts.pull({ _id: bankId });
         await user.save();
 
         console.log(`[BANK_DELETE] Successfully deleted bank ${bankId}`);
