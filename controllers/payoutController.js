@@ -15,6 +15,22 @@ export const requestPayout = async (req, res) => {
         });
 
         await payout.save();
+
+        // Notify Admins about payout request (only those with "Payout Settlements" permission)
+        try {
+            const { notifyAdminsByModule } = await import("../services/notificationService.js");
+            const retailer = await User.findById(retailerId).select("name businessDetails");
+            
+            await notifyAdminsByModule("Payout Settlements", {
+                title: "New Payout Request! 💰",
+                message: `Retailer "${retailer.businessDetails?.businessName || retailer.name}" has requested a payout of ₹${amount}.`,
+                type: "System",
+                referenceId: payout._id.toString()
+            });
+        } catch (err) {
+            console.error("Payout notification error:", err.message);
+        }
+
         res.status(201).json({ message: "Payout requested successfully", payout });
     } catch (error) {
         res.status(500).json({ message: error.message });

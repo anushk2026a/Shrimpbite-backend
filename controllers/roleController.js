@@ -109,6 +109,19 @@ export const inviteAdmin = async (req, res) => {
         // Send Email
         const emailSent = await sendAdminInviteEmail(email, name, tempPassword, role.name);
 
+        // Notify Admins about new invitation (only those with "Admin Control" permission)
+        try {
+            const { notifyAdminsByModule } = await import("../services/notificationService.js");
+            await notifyAdminsByModule("Admin Control", {
+                title: "New Team Member! 👔",
+                message: `Admin ${newUser.name} was successfully invited to the panel by ${req.user.name}.`,
+                type: "System",
+                referenceId: newUser._id.toString()
+            });
+        } catch (err) {
+            console.error("Admin invitation notification error:", err.message);
+        }
+
         res.status(201).json({ 
             success: true, 
             message: "User invited successfully",

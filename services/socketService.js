@@ -161,7 +161,7 @@ export const emitChatUpdate = async (chatId, message) => {
 };
 
 export const emitNotification = async (recipientId, notification) => {
-    const room = `retailer_notifications_${recipientId}`;
+    const room = `notifications_${recipientId}`;
     const payload = { ...notification, createdAt: new Date() };
 
     _log("Emitting Notification", { data: { room, title: notification.title } });

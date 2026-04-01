@@ -159,8 +159,39 @@ export const removeInvalidFCMToken = async (fcmToken) => {
 /**
  * Sends an email receipt/notification.
  */
-export const sendEmailReceipt = async (email, { orderId, html }) => {
-    console.log(`[Email Receipt] To: ${email} | Order: ${orderId}`);
-    // Logic for receipts - can reuse transporter from emailService if needed
-    return { success: true };
+
+/**
+ * Notifies all admins who have a specific module permission.
+ * @param {string} moduleName - The module name to check (e.g., "Retailers", "Payout Settlements").
+ * @param {object} notificationData - { title, message, type, referenceId }
+ */
+export const notifyAdminsByModule = async (moduleName, { title, message, type, referenceId }) => {
+    try {
+        const User = (await import("../models/User.js")).default;
+        const Role = (await import("../models/Role.js")).default;
+
+        // 1. Find all roles that have this module (case-insensitive or exact match based on your convention)
+        const authorizedRoles = await Role.find({ modules: moduleName }).select("_id");
+        const roleIds = authorizedRoles.map(r => r._id);
+
+        // 2. Find all admins who have one of these roles OR have NO role (Super Admin)
+        const admins = await User.find({
+            role: "admin",
+            $or: [
+                { adminRole: { $in: roleIds } },
+                { adminRole: null } // Super Admins get all
+            ]
+        }).select("_id");
+
+        if (admins.length === 0) return;
+
+        // 3. Send notification to each
+        const notificationPromises = admins.map(admin => 
+            createNotification(admin._id.toString(), { title, message, type, referenceId })
+        );
+
+        await Promise.all(notificationPromises);
+    } catch (error) {
+        console.error(`[Admin Module Notification Error] Module: ${moduleName} -`, error.message);
+    }
 };

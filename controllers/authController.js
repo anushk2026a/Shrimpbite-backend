@@ -103,6 +103,19 @@ export const onboardUser = async (req, res) => {
 
         await user.save()
 
+        // Notify Admins about new onboarding submission (only those with Retailers permission)
+        try {
+            const { notifyAdminsByModule } = await import("../services/notificationService.js");
+            await notifyAdminsByModule("Retailers", {
+                title: "New Retailer Onboarding! 🏪",
+                message: `Retailer "${user.businessDetails?.businessName || user.name}" has submitted their details for review.`,
+                type: "System",
+                referenceId: user._id.toString()
+            });
+        } catch (err) {
+            console.error("Admin Notification failed:", err.message);
+        }
+
         res.status(200).json({ message: "Onboarding details submitted", status: user.status })
     } catch (error) {
         console.error(error)
