@@ -805,3 +805,60 @@ export const assignRiderToOrder = async (req, res) => {
         res.status(500).json({ success: false, message: error.message });
     }
 };
+
+// ─── Bank Accounts Management ────────────────────────────────────────────────
+
+export const getBankAccounts = async (req, res) => {
+    try {
+        const user = await User.findById(req.user.id).select("bankAccounts");
+        res.status(200).json({ success: true, bankAccounts: user.bankAccounts || [] });
+    } catch (error) {
+        res.status(500).json({ success: false, message: error.message });
+    }
+};
+
+export const addBankAccount = async (req, res) => {
+    try {
+        const { bankName, accountNumber, ifscCode, accountHolderName } = req.body;
+        
+        // Basic validation matching frontend requirements
+        if (!/^\d+$/.test(accountNumber)) {
+            return res.status(400).json({ success: false, message: "Account number must contain only numbers." });
+        }
+        if (!/^[A-Za-z]{4}0[A-Za-z0-9]{6}$/.test(ifscCode)) {
+            return res.status(400).json({ success: false, message: "Invalid IFSC Code format. Must be 11 characters, first 4 letters, 5th is '0', last 6 alphanumeric." });
+        }
+
+        const user = await User.findById(req.user.id);
+        const newBank = {
+            bankName,
+            accountNumber,
+            ifscCode: ifscCode.toUpperCase(),
+            accountHolderName,
+            isDefault: user.bankAccounts.length === 0
+        };
+
+        user.bankAccounts.push(newBank);
+        await user.save();
+
+        res.status(201).json({ success: true, message: "Bank account added successfully", bankAccounts: user.bankAccounts });
+    } catch (error) {
+        res.status(500).json({ success: false, message: error.message });
+    }
+};
+
+export const deleteBankAccount = async (req, res) => {
+    try {
+        const { bankId } = req.params;
+        const user = await User.findById(req.user.id);
+        
+        // Delete by filtering out the matching bank ID
+        user.bankAccounts = user.bankAccounts.filter(b => b._id.toString() !== bankId);
+        await user.save();
+
+        res.status(200).json({ success: true, message: "Bank account deleted successfully", bankAccounts: user.bankAccounts });
+    } catch (error) {
+        res.status(500).json({ success: false, message: error.message });
+    }
+};
+

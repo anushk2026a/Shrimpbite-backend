@@ -10,10 +10,15 @@ import {
     deleteProduct
 } from "../controllers/productController.js";
 import { updateRetailerProfile } from "../controllers/authController.js";
-import { toggleShopStatus, finalizeOrderWeight, getRetailerDashboardStats, getRetailerCustomers, getRetailerRevenueStats, getRetailerOrders, getRetailerReviews, updateOrderItemStatus, assignRiderToOrder } from "../controllers/shopController.js";
+import { toggleShopStatus, finalizeOrderWeight, getRetailerDashboardStats, getRetailerCustomers, getRetailerRevenueStats, getRetailerOrders, getRetailerReviews, updateOrderItemStatus, assignRiderToOrder, getBankAccounts, addBankAccount, deleteBankAccount } from "../controllers/shopController.js";
 import { getDailyPrepList } from "../services/prepService.js";
 
 const router = express.Router();
+
+// Bank Accounts
+router.get("/banks", protect, retailerOnly, getBankAccounts);
+router.post("/banks", protect, retailerOnly, addBankAccount);
+router.delete("/banks/:bankId", protect, retailerOnly, deleteBankAccount);
 
 // Dashboard Stats
 router.get("/dashboard-stats", protect, retailerOnly, getRetailerDashboardStats);

@@ -70,6 +70,13 @@ const userSchema = new mongoose.Schema({
         },
         storeImage: String
     },
+    bankAccounts: [{
+        bankName: String,
+        accountNumber: String,
+        ifscCode: String,
+        accountHolderName: String,
+        isDefault: { type: Boolean, default: false }
+    }],
     fcmToken: {
         type: String
     }
