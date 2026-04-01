@@ -56,12 +56,18 @@ export const getDailyPrepList = async (retailerId, dateString) => {
         for (const sub of subscriptions) {
             let shouldDeliver = false;
             
+            // Normalize dates to start of day for accurate comparison
+            const subStart = new Date(sub.startDate);
+            subStart.setHours(0, 0, 0, 0);
+            const target = new Date(targetDate);
+            target.setHours(0, 0, 0, 0);
+
             // Frequency Logic
             if (sub.frequency === "Daily") {
                 shouldDeliver = true;
             } else if (sub.frequency === "Alternate Days") {
-                const diffTime = Math.abs(targetDate - new Date(sub.startDate));
-                const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                const diffTime = Math.abs(target - subStart);
+                const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
                 if (diffDays % 2 === 0) shouldDeliver = true;
             } else if (sub.frequency === "Weekly") {
                 if (sub.customDays && sub.customDays.some(d => d.toLowerCase() === targetDayName.toLowerCase())) {
@@ -70,9 +76,11 @@ export const getDailyPrepList = async (retailerId, dateString) => {
             }
 
             // Vacation Check
-            const isOnVacation = sub.vacationDates && sub.vacationDates.some(vDate =>
-                new Date(vDate).toDateString() === targetDate.toDateString()
-            );
+            const isOnVacation = sub.vacationDates && sub.vacationDates.some(vDate => {
+                const vacationDate = new Date(vDate);
+                vacationDate.setHours(0, 0, 0, 0);
+                return vacationDate.getTime() === target.getTime();
+            });
 
             if (shouldDeliver && !isOnVacation) {
                 addItemToRequirements({

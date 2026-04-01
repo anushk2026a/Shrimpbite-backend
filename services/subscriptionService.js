@@ -38,11 +38,18 @@ export const generateDailyOrders = async (targetDate = new Date()) => {
 
         try {
             let shouldDeliver = false;
+            
+            // Normalize dates for accurate comparison
+            const subStart = new Date(sub.startDate);
+            subStart.setHours(0, 0, 0, 0);
+            const targetDay = new Date(targetDate);
+            targetDay.setHours(0, 0, 0, 0);
+
             if (sub.frequency === "Daily") {
                 shouldDeliver = true;
             } else if (sub.frequency === "Alternate Days") {
-                const diffTime = Math.abs(targetDate - sub.startDate);
-                const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                const diffTime = Math.abs(targetDay - subStart);
+                const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
                 if (diffDays % 2 === 0) shouldDeliver = true;
             } else if (sub.frequency === "Weekly") {
                 // Case-insensitive check for day names
@@ -51,9 +58,11 @@ export const generateDailyOrders = async (targetDate = new Date()) => {
                 }
             }
 
-            const isOnVacation = sub.vacationDates.some(vDate =>
-                vDate.toDateString() === targetDate.toDateString()
-            );
+            const isOnVacation = sub.vacationDates.some(vDate => {
+                const vacationDate = new Date(vDate);
+                vacationDate.setHours(0, 0, 0, 0);
+                return vacationDate.getTime() === targetDay.getTime();
+            });
 
             if (!shouldDeliver) {
                 console.log(`[SKIP] Frequency/Day Mismatch: Sub ${sub._id} (Freq: ${sub.frequency}, Days: ${sub.customDays}, Today: ${currentDayName})`);
@@ -66,12 +75,6 @@ export const generateDailyOrders = async (targetDate = new Date()) => {
                 stats.skipped++;
                 continue;
             }
-
-            // Check if subscription has started yet
-            const subStart = new Date(sub.startDate);
-            subStart.setHours(0, 0, 0, 0);
-            const targetDay = new Date(targetDate);
-            targetDay.setHours(0, 0, 0, 0);
 
             // If start date is in the future (beyond today), skip
             if (targetDay < subStart) {
