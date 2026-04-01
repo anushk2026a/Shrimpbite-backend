@@ -16,37 +16,37 @@ import {
     updateSubscriptionPlan,
     deleteSubscriptionPlan
 } from "../controllers/subscriptionController.js";
-import { protect, adminOnly } from "../middleware/authMiddleware.js";
+import { protect, adminOnly, checkModuleAccess } from "../middleware/authMiddleware.js";
 
 const router = express.Router()
 
+// Use protect and adminOnly for ALL routes in this file
+router.use(protect);
+router.use(adminOnly);
+
 // Dashboard
-router.get("/dashboard-stats", protect, adminOnly, getDashboardStats)
+router.get("/dashboard-stats", checkModuleAccess("Dashboard"), getDashboardStats)
 
-// Get all retailers (can filter by status)
-router.get("/retailers", getRetailers)
+// Retailer Management
+router.get("/retailers", checkModuleAccess("Retailers"), getRetailers)
+router.put("/retailers/status", checkModuleAccess("Retailers"), updateRetailerStatus)
 
-// Get all app users
-router.get("/users", getAppUsers)
+// User Management (Customers)
+router.get("/users", checkModuleAccess("App Users"), getAppUsers)
 
-// Category Management
-router.get("/categories", getCategories)
-router.post("/categories", createCategory)
-router.put("/categories/:id", updateCategory)
-router.delete("/categories/:id", deleteCategory)
+// Category Management (General System Control)
+router.get("/categories", checkModuleAccess("Dashboard"), getCategories)
+router.post("/categories", checkModuleAccess("Dashboard"), createCategory)
+router.put("/categories/:id", checkModuleAccess("Dashboard"), updateCategory)
+router.delete("/categories/:id", checkModuleAccess("Dashboard"), deleteCategory)
 
-// Update retailer status (approve/reject/suspend)
-router.put("/retailers/status", updateRetailerStatus)
-
-// Subscription Management
-router.get("/subscriptions", getSubscriptionPlans)
-router.post("/subscriptions", createSubscriptionPlan)
-router.put("/subscriptions/:id", updateSubscriptionPlan)
-router.delete("/subscriptions/:id", deleteSubscriptionPlan)
-
-
+// Subscription/Plan Management (General System Control)
+router.get("/subscriptions", checkModuleAccess("Dashboard"), getSubscriptionPlans)
+router.post("/subscriptions", checkModuleAccess("Dashboard"), createSubscriptionPlan)
+router.put("/subscriptions/:id", checkModuleAccess("Dashboard"), updateSubscriptionPlan)
+router.delete("/subscriptions/:id", checkModuleAccess("Dashboard"), deleteSubscriptionPlan)
 
 // Order Management
-router.get("/orders", protect, adminOnly, getAllOrders)
+router.get("/orders", checkModuleAccess("Order Management"), getAllOrders)
 
 export default router

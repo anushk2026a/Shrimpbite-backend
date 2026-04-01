@@ -65,10 +65,48 @@ export const retailerOnly = (req, res, next) => {
     }
 };
 
+
 export const riderOnly = (req, res, next) => {
     if (req.user && req.user.role === "rider") {
         next();
     } else {
         res.status(403).json({ message: "Rider access required" });
     }
+};
+
+/**
+ * Middleware to check if an admin has access to a specific module.
+ * Superadmins (adminRole is null) bypass this check.
+ */
+export const checkModuleAccess = (moduleName) => {
+    return async (req, res, next) => {
+        try {
+            // 1. Ensure user is an admin first
+            if (!req.user || req.user.role !== "admin") {
+                return res.status(403).json({ message: "Admin access required" });
+            }
+
+            // 2. Superadmins (adminRole is null) always have access
+            // Note: In some systems adminRole might be undefined or null for superadmins
+            if (!req.user.adminRole) {
+                return next();
+            }
+
+            // 3. For regular admins, check their role's modules
+            // We populate it here to ensure we have the latest permissions
+            const userWithRole = await User.findById(req.user._id).populate("adminRole");
+            
+            if (userWithRole && userWithRole.adminRole && userWithRole.adminRole.modules.includes(moduleName)) {
+                return next();
+            }
+
+            return res.status(403).json({
+                success: false,
+                message: `Access denied: Module '${moduleName}' permission required.`
+            });
+        } catch (error) {
+            console.error(`Module Access Error (${moduleName}):`, error);
+            res.status(500).json({ success: false, message: "Internal server error during authorization" });
+        }
+    };
 };

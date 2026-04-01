@@ -7,7 +7,7 @@ import {
     getAdmins,
     updateAdminRole,
 } from "../controllers/roleController.js";
-import { protect, adminOnly } from "../middleware/authMiddleware.js";
+import { protect, adminOnly, checkModuleAccess } from "../middleware/authMiddleware.js";
 
 const router = express.Router();
 
@@ -15,18 +15,18 @@ router.use(protect);
 router.use(adminOnly);
 
 router.route("/")
-    .post(createRole)
-    .get(getRoles);
+    .post(checkModuleAccess("Control Authority"), createRole)
+    .get(checkModuleAccess("Control Authority"), getRoles);
 
 router.route("/:id")
-    .put(updateRole);
+    .put(checkModuleAccess("Control Authority"), updateRole);
 
-router.post("/invite", inviteAdmin);
+router.post("/invite", checkModuleAccess("Admin role"), inviteAdmin);
 
 router.route("/admins")
-    .get(getAdmins);
+    .get(checkModuleAccess("Admin role"), getAdmins);
 
 router.route("/admins/:id/role")
-    .put(updateAdminRole);
+    .put(checkModuleAccess("Admin role"), updateAdminRole);
 
 export default router;
