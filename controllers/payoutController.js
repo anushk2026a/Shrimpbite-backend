@@ -63,7 +63,7 @@ export const approvePayout = async (req, res) => {
         // Notify Retailer about approved payout
         try {
             const { createNotification } = await import("../services/notificationService.js");
-            createNotification(payout.retailer.toString(), {
+            await createNotification(payout.retailer.toString(), {
                 title: "Payout Approved! 🎉",
                 message: `Your payout request for ₹${payout.amount} has been approved and processed.`,
                 type: "System",
