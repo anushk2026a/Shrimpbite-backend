@@ -1,6 +1,7 @@
 import Payout from "../models/Payout.js";
 import User from "../models/User.js"; // Assuming Retailer is a type of User or related
 import AppUser from "../models/AppUser.js";
+import { emitPayoutUpdate } from "../services/socketService.js";
 
 export const requestPayout = async (req, res) => {
     try {
@@ -30,6 +31,9 @@ export const requestPayout = async (req, res) => {
         } catch (err) {
             console.error("Payout notification error:", err.message);
         }
+
+        // Real-time socket update for admin table
+        emitPayoutUpdate(payout);
 
         res.status(201).json({ message: "Payout requested successfully", payout });
     } catch (error) {
@@ -72,6 +76,9 @@ export const approvePayout = async (req, res) => {
         } catch (err) {
             console.error("Retailer payout notification error:", err.message);
         }
+
+        // Real-time socket update for admin table
+        emitPayoutUpdate(payout);
 
         res.json({ message: "Payout approved", payout });
     } catch (error) {

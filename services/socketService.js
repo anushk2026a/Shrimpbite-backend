@@ -242,3 +242,13 @@ export const emitShopStatusUpdate = (shopId, isShopActive) => {
     //     }).catch(err => console.error("Relay shop status update failed:", err.message));
     // }
 };
+
+export const emitPayoutUpdate = (payoutData) => {
+    _log("Emitting Payout Update (Real-time Table)", { data: payoutData?._id });
+
+    if (io) {
+        // Emit to admin room and general broadcast for table updates
+        io.to("admin").emit("payoutUpdate", payoutData);
+        io.emit("payoutUpdate", payoutData); 
+    }
+};
