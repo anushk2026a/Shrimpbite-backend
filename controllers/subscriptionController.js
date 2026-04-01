@@ -68,26 +68,32 @@ export const updateVacation = async (req, res) => {
         const { subscriptionId, startDate, endDate } = req.body;
         const start = new Date(startDate);
         const end = new Date(endDate);
-        const now = new Date();
 
-        // 8 PM Cut-off Logic
-        // Determine the earliest allowed start date based on the time
-        const cutoffHour = 20; // 8:00 PM
-        const minStartDate = new Date(now);
+        // 8 PM Cut-off Logic based on Indian Standard Time (IST / UTC+5:30)
+        // AWS Stockholm servers default to UTC. 
+        const nowUTC = new Date();
+        const istOffsetMs = 5.5 * 60 * 60 * 1000;
+        const nowIST = new Date(nowUTC.getTime() + istOffsetMs);
         
-        if (now.getHours() >= cutoffHour) {
-            // Past 8 PM: Earliest start is Day After Tomorrow
-            minStartDate.setDate(now.getDate() + 2);
-        } else {
-            // Before 8 PM: Earliest start is Tomorrow
-            minStartDate.setDate(now.getDate() + 1);
-        }
-        minStartDate.setHours(0, 0, 0, 0);
+        const cutoffHour = 20; // 8:00 PM IST
+        
+        // Normalize the user's requested start date to midnight
+        const startNormalized = new Date(Date.UTC(start.getUTCFullYear(), start.getUTCMonth(), start.getUTCDate()));
+        
+        // Calculate the minimum exact allowed start date
+        const minStartDate = new Date(Date.UTC(
+            nowIST.getUTCFullYear(),
+            nowIST.getUTCMonth(),
+            nowIST.getUTCDate() + (nowIST.getUTCHours() >= cutoffHour ? 2 : 1)
+        ));
 
-        if (start < minStartDate) {
+        if (startNormalized < minStartDate) {
+            const day = String(minStartDate.getUTCDate()).padStart(2, '0');
+            const month = String(minStartDate.getUTCMonth() + 1).padStart(2, '0');
+            const year = minStartDate.getUTCFullYear();
             return res.status(400).json({
                 success: false,
-                message: `After 8:00 PM cut-off, your vacation can only start from ${minStartDate.toLocaleDateString()}. Please contact the store for urgent changes.`
+                message: `After 8:00 PM cut-off, your vacation can only start from ${day}/${month}/${year}. Please contact the store for urgent changes.`
             });
         }
 
