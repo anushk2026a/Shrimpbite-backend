@@ -19,6 +19,11 @@ const payoutSchema = new mongoose.Schema({
         type: Date,
         default: Date.now
     },
+    bankDetails: {
+        bankName: String,
+        accountNumber: String,
+        ifscCode: String
+    },
     processedAt: Date,
     adminComment: String,
     transactionId: String // Payment gateway reference
