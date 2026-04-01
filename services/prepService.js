@@ -47,10 +47,11 @@ export const getDailyPrepList = async (retailerId, dateString) => {
         const dayNames = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
         const targetDayName = dayNames[targetDate.getDay()];
 
+        // Broaden the search by using nextDay so we don't miss subscriptions starting throughout the targetDay
         const subscriptions = await Subscription.find({
             retailer: retailerId,
             status: "Active",
-            startDate: { $lte: targetDate }
+            startDate: { $lt: nextDay } 
         }).populate("product");
 
         for (const sub of subscriptions) {
@@ -81,6 +82,11 @@ export const getDailyPrepList = async (retailerId, dateString) => {
                 vacationDate.setHours(0, 0, 0, 0);
                 return vacationDate.getTime() === target.getTime();
             });
+
+            // Ensure the subscription has actually started relative to the target day
+            if (target < subStart) {
+                shouldDeliver = false;
+            }
 
             if (shouldDeliver && !isOnVacation) {
                 addItemToRequirements({

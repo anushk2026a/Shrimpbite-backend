@@ -13,19 +13,26 @@ export const subscribeToProduct = async (req, res) => {
             return res.status(404).json({ success: false, message: "Product not found" });
         }
 
-        // 10 PM Cut-off Logic
-        const now = new Date();
-        const cutoffHour = 22; // 10 PM
-        const isPastCutoff = now.getHours() >= cutoffHour;
-        const requestedStartDate = new Date(startDate || now);
+        // 8 PM IST Cut-off Logic (India Standard Time)
+        // Ensure consistent rules for everyone regardless of server location (Stockholm, etc.)
+        const nowUTC = new Date();
+        const istOffsetMs = 5.5 * 60 * 60 * 1000;
+        const nowIST = new Date(nowUTC.getTime() + istOffsetMs);
+        
+        const cutoffHour = 20; // 8:00 PM IST
+        const isPastCutoff = nowIST.getHours() >= cutoffHour;
+        
+        let requestedStartDate = new Date(startDate || nowIST);
+        requestedStartDate.setHours(0, 0, 0, 0);
 
         if (isPastCutoff) {
-            const dayAfterTomorrow = new Date();
+            // Cut-off passed: Next available start is Day After Tomorrow
+            const dayAfterTomorrow = new Date(nowIST);
             dayAfterTomorrow.setDate(dayAfterTomorrow.getDate() + 2);
             dayAfterTomorrow.setHours(0, 0, 0, 0);
 
             if (requestedStartDate < dayAfterTomorrow) {
-                requestedStartDate.setTime(dayAfterTomorrow.getTime());
+                requestedStartDate = dayAfterTomorrow;
             }
         }
 
