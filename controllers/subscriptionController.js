@@ -68,6 +68,28 @@ export const updateVacation = async (req, res) => {
         const { subscriptionId, startDate, endDate } = req.body;
         const start = new Date(startDate);
         const end = new Date(endDate);
+        const now = new Date();
+
+        // 8 PM Cut-off Logic
+        // Determine the earliest allowed start date based on the time
+        const cutoffHour = 20; // 8:00 PM
+        const minStartDate = new Date(now);
+        
+        if (now.getHours() >= cutoffHour) {
+            // Past 8 PM: Earliest start is Day After Tomorrow
+            minStartDate.setDate(now.getDate() + 2);
+        } else {
+            // Before 8 PM: Earliest start is Tomorrow
+            minStartDate.setDate(now.getDate() + 1);
+        }
+        minStartDate.setHours(0, 0, 0, 0);
+
+        if (start < minStartDate) {
+            return res.status(400).json({
+                success: false,
+                message: `After 8:00 PM cut-off, your vacation can only start from ${minStartDate.toLocaleDateString()}. Please contact the store for urgent changes.`
+            });
+        }
 
         const dates = [];
         let current = new Date(start);
