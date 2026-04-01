@@ -41,7 +41,7 @@ export const globalSearch = async (req, res) => {
             businessName: shop.businessDetails?.businessName,
             image: shop.businessDetails?.storeImage || "",
             location: shop.businessDetails?.location?.city || "",
-            isShopActive: shop.isShopActive ?? true,
+            isShopActive: shop.isShopActive ?? false,
             rating: 4.5,
             deliveryTime: "30-45 mins"
         }));

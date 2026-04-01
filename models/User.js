@@ -29,7 +29,7 @@ const userSchema = new mongoose.Schema({
         default: false
     },
     walletBalance: { type: Number, default: 0 },
-    isShopActive: { type: Boolean, default: true },
+    isShopActive: { type: Boolean, default: false },
     phone: {
         type: String,
         required: function() { return this.role !== "admin"; },

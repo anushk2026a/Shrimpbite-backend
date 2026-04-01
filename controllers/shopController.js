@@ -40,7 +40,7 @@ export const getPublicShops = async (req, res) => {
                 businessName: shop.businessDetails?.businessName,
                 image: shop.businessDetails?.storeImage || "",
                 location: shop.businessDetails?.location?.city || "",
-                isShopActive: shop.isShopActive ?? true,
+                isShopActive: shop.isShopActive ?? false,
                 rating: rating,
                 deliveryTime: "30-45 mins"
             };
@@ -76,7 +76,7 @@ export const getShopDetails = async (req, res) => {
                 image: shop.businessDetails?.storeImage || "",
                 address: shop.businessDetails?.location,
                 contact: shop.email,
-                isShopActive: shop.isShopActive ?? true,
+                isShopActive: shop.isShopActive ?? false,
                 rating: rating
             }
         });
