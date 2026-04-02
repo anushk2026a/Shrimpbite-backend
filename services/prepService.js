@@ -53,8 +53,9 @@ export const getDailyPrepList = async (retailerId, dateString) => {
 
     const existingSubIds = new Set(orders.filter(o => o.orderType === "Subscription").map(o => o.subscriptionId?.toString()));
 
-    // 2. Process existing orders first
+    // 2. Process existing orders first (ONLY SUBSCRIPTIONS)
     orders.forEach(order => {
+        if (order.orderType !== "Subscription") return;
         order.items.forEach(item => {
             if (item.retailer && item.retailer.toString() === retailerId.toString()) {
                 addItemToRequirements(item, order.orderType, item.status);
@@ -62,7 +63,7 @@ export const getDailyPrepList = async (retailerId, dateString) => {
         });
     });
 
-    // 3. Smart Predictive Mode: Add active subscriptions that DON'T have an order yet (filtered by wallet health)
+    // 3. Smart Predictive Mode: Filter active subscriptions
     const dayNames = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
     const targetDayName = dayNames[targetDate.getDay()];
 
@@ -70,36 +71,21 @@ export const getDailyPrepList = async (retailerId, dateString) => {
         retailer: retailerId,
         status: "Active",
         startDate: { $lt: nextDay } 
-    }).populate("product").populate("user"); // Populate user for financial health check
+    }).populate("product").populate("user");
 
     for (const sub of subscriptions) {
-        // RULE 1: Check for Ghost Users
-        if (!sub.user) {
-            console.log(`[CLEANUP] Ghost Subscription found: ${sub._id} - Skipping.`);
-            continue;
-        }
+        if (!sub.user) continue;
 
-        // RULE 2: Financial Health Check (Wallet Balance)
         const productPrice = sub.product?.price || 0;
-        if (sub.user.walletBalance < (productPrice * sub.quantity)) {
-            // Keep it hidden from the prep list if they can't pay today
-            continue;
-        }
-
-        // If an order already exists for today, skip it (already handled in step 2)
-        if (!isFuture && existingSubIds.has(sub._id.toString())) {
-            continue;
-        }
+        if (sub.user.walletBalance < (productPrice * sub.quantity)) continue;
+        if (!isFuture && existingSubIds.has(sub._id.toString())) continue;
 
         let shouldDeliver = false;
-        
-        // Date comparison logic
         const subStart = new Date(sub.startDate);
         subStart.setHours(0, 0, 0, 0);
         const target = new Date(targetDate);
         target.setHours(0, 0, 0, 0);
 
-        // RULE 3: Frequency Logic
         if (sub.frequency === "Daily") {
             shouldDeliver = true;
         } else if (sub.frequency === "Alternate Days") {
@@ -107,21 +93,15 @@ export const getDailyPrepList = async (retailerId, dateString) => {
             const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
             if (diffDays % 2 === 0) shouldDeliver = true;
         } else if (sub.frequency === "Weekly") {
-            if (sub.customDays && sub.customDays.some(d => d.toLowerCase() === targetDayName.toLowerCase())) {
-                shouldDeliver = true;
-            }
+            if (sub.customDays && sub.customDays.some(d => d.toLowerCase() === targetDayName.toLowerCase())) shouldDeliver = true;
         }
 
-        // RULE 4: Hardened Vacation Check
         const isOnVacation = sub.vacationDates && sub.vacationDates.some(vDate => {
             const vString = new Date(vDate).toISOString().split('T')[0];
             return vString === targetDateISO;
         });
 
-        // Start Date check
-        if (target < subStart) {
-            shouldDeliver = false;
-        }
+        if (target < subStart) shouldDeliver = false;
 
         if (shouldDeliver && !isOnVacation) {
             addItemToRequirements({
@@ -135,7 +115,12 @@ export const getDailyPrepList = async (retailerId, dateString) => {
     const detailedItems = [];
 
     // Add items from existing orders
-    orders.forEach(order => {
+    for (const order of orders) {
+        if (order.orderType !== "Subscription") continue;
+        
+        // Find subscription details for frequency display
+        const subDetails = await Subscription.findById(order.subscriptionId).select('frequency customDays');
+
         order.items.forEach(item => {
             if (item.retailer && item.retailer.toString() === retailerId.toString()) {
                 detailedItems.push({
@@ -147,22 +132,21 @@ export const getDailyPrepList = async (retailerId, dateString) => {
                     quantity: item.quantity,
                     unit: item.product.unit || "kg",
                     status: item.status,
+                    frequency: subDetails?.frequency || "Subscription",
+                    customDays: subDetails?.customDays || []
                 });
             }
         });
-    });
+    }
 
     // Add items from predictive subscriptions (that don't have an order yet)
     for (const sub of subscriptions) {
         let shouldDeliver = false;
-        
-        // Date comparison logic
         const subStart = new Date(sub.startDate);
         subStart.setHours(0, 0, 0, 0);
         const target = new Date(targetDate);
         target.setHours(0, 0, 0, 0);
 
-        // Filter Logic (Balance, Ghost, Frequency, Vacation)
         const productPrice = sub.product?.price || 0;
         if (!sub.user || sub.user.walletBalance < (productPrice * sub.quantity)) continue;
         if (!isFuture && existingSubIds.has(sub._id.toString())) continue;
@@ -194,12 +178,14 @@ export const getDailyPrepList = async (retailerId, dateString) => {
                 quantity: sub.quantity,
                 unit: sub.product.unit || "kg",
                 status: "Pending",
+                frequency: sub.frequency,
+                customDays: sub.customDays
             });
         }
     }
 
     return {
-        summary: Object.values(requirements),
+        summary: Object.values(requirements).filter(r => r.subscriptionCount > 0),
         detailed: detailedItems
     };
 };
