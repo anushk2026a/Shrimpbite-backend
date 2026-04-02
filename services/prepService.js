@@ -62,7 +62,7 @@ export const getDailyPrepList = async (retailerId, dateString) => {
         });
     });
 
-    // 3. Predictive Mode: Add active subscriptions that DON'T have an order yet (or are in the future)
+    // 3. Smart Predictive Mode: Add active subscriptions that DON'T have an order yet (filtered by wallet health)
     const dayNames = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
     const targetDayName = dayNames[targetDate.getDay()];
 
@@ -70,9 +70,22 @@ export const getDailyPrepList = async (retailerId, dateString) => {
         retailer: retailerId,
         status: "Active",
         startDate: { $lt: nextDay } 
-    }).populate("product");
+    }).populate("product").populate("user"); // Populate user for financial health check
 
     for (const sub of subscriptions) {
+        // RULE 1: Check for Ghost Users
+        if (!sub.user) {
+            console.log(`[CLEANUP] Ghost Subscription found: ${sub._id} - Skipping.`);
+            continue;
+        }
+
+        // RULE 2: Financial Health Check (Wallet Balance)
+        const productPrice = sub.product?.price || 0;
+        if (sub.user.walletBalance < (productPrice * sub.quantity)) {
+            // Keep it hidden from the prep list if they can't pay today
+            continue;
+        }
+
         // If an order already exists for today, skip it (already handled in step 2)
         if (!isFuture && existingSubIds.has(sub._id.toString())) {
             continue;
@@ -86,7 +99,7 @@ export const getDailyPrepList = async (retailerId, dateString) => {
         const target = new Date(targetDate);
         target.setHours(0, 0, 0, 0);
 
-        // Frequency Logic
+        // RULE 3: Frequency Logic
         if (sub.frequency === "Daily") {
             shouldDeliver = true;
         } else if (sub.frequency === "Alternate Days") {
@@ -99,7 +112,7 @@ export const getDailyPrepList = async (retailerId, dateString) => {
             }
         }
 
-        // Hardened Vacation Check: Use ISO String comparison to avoid timezone drift
+        // RULE 4: Hardened Vacation Check
         const isOnVacation = sub.vacationDates && sub.vacationDates.some(vDate => {
             const vString = new Date(vDate).toISOString().split('T')[0];
             return vString === targetDateISO;
