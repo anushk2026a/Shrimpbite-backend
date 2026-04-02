@@ -118,8 +118,8 @@ export const getDailyPrepList = async (retailerId, dateString) => {
     for (const order of orders) {
         if (order.orderType !== "Subscription") continue;
         
-        // Find subscription details for frequency display
-        const subDetails = await Subscription.findById(order.subscriptionId).select('frequency customDays');
+        // Find subscription details
+        const sub = await Subscription.findById(order.subscriptionId).select('frequency customDays status');
 
         order.items.forEach(item => {
             if (item.retailer && item.retailer.toString() === retailerId.toString()) {
@@ -132,8 +132,9 @@ export const getDailyPrepList = async (retailerId, dateString) => {
                     quantity: item.quantity,
                     unit: item.product.unit || "kg",
                     status: item.status,
-                    frequency: subDetails?.frequency || "Subscription",
-                    customDays: subDetails?.customDays || []
+                    frequency: sub?.frequency || "Subscription",
+                    customDays: sub?.customDays || [],
+                    isLastDelivery: sub?.status === "PendingCancellation"
                 });
             }
         });
@@ -141,6 +142,7 @@ export const getDailyPrepList = async (retailerId, dateString) => {
 
     // Add items from predictive subscriptions (that don't have an order yet)
     for (const sub of subscriptions) {
+        // ... (logic remains same, just adding field to push)
         let shouldDeliver = false;
         const subStart = new Date(sub.startDate);
         subStart.setHours(0, 0, 0, 0);
@@ -179,7 +181,8 @@ export const getDailyPrepList = async (retailerId, dateString) => {
                 unit: sub.product.unit || "kg",
                 status: "Pending",
                 frequency: sub.frequency,
-                customDays: sub.customDays
+                customDays: sub.customDays,
+                isLastDelivery: sub.status === "PendingCancellation"
             });
         }
     }
