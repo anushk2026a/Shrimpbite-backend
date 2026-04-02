@@ -131,7 +131,75 @@ export const getDailyPrepList = async (retailerId, dateString) => {
         }
     }
 
-    return Object.values(requirements);
+    // 4. Build Final Response
+    const detailedItems = [];
 
-    return Object.values(requirements);
+    // Add items from existing orders
+    orders.forEach(order => {
+        order.items.forEach(item => {
+            if (item.retailer && item.retailer.toString() === retailerId.toString()) {
+                detailedItems.push({
+                    id: order._id + "_" + item.product._id,
+                    orderId: order.orderId,
+                    orderType: order.orderType,
+                    productId: item.product._id,
+                    productName: item.product.name,
+                    quantity: item.quantity,
+                    unit: item.product.unit || "kg",
+                    status: item.status,
+                });
+            }
+        });
+    });
+
+    // Add items from predictive subscriptions (that don't have an order yet)
+    for (const sub of subscriptions) {
+        let shouldDeliver = false;
+        
+        // Date comparison logic
+        const subStart = new Date(sub.startDate);
+        subStart.setHours(0, 0, 0, 0);
+        const target = new Date(targetDate);
+        target.setHours(0, 0, 0, 0);
+
+        // Filter Logic (Balance, Ghost, Frequency, Vacation)
+        const productPrice = sub.product?.price || 0;
+        if (!sub.user || sub.user.walletBalance < (productPrice * sub.quantity)) continue;
+        if (!isFuture && existingSubIds.has(sub._id.toString())) continue;
+
+        if (sub.frequency === "Daily") {
+            shouldDeliver = true;
+        } else if (sub.frequency === "Alternate Days") {
+            const diffTime = Math.abs(target - subStart);
+            const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
+            if (diffDays % 2 === 0) shouldDeliver = true;
+        } else if (sub.frequency === "Weekly") {
+            if (sub.customDays && sub.customDays.some(d => d.toLowerCase() === targetDayName.toLowerCase())) shouldDeliver = true;
+        }
+
+        const isOnVacation = sub.vacationDates && sub.vacationDates.some(vDate => {
+            const vString = new Date(vDate).toISOString().split('T')[0];
+            return vString === targetDateISO;
+        });
+
+        if (target < subStart) shouldDeliver = false;
+
+        if (shouldDeliver && !isOnVacation) {
+            detailedItems.push({
+                id: "PRE-" + sub._id,
+                orderId: "WAITING-BILLING",
+                orderType: "Subscription",
+                productId: sub.product._id,
+                productName: sub.product.name,
+                quantity: sub.quantity,
+                unit: sub.product.unit || "kg",
+                status: "Pending",
+            });
+        }
+    }
+
+    return {
+        summary: Object.values(requirements),
+        detailed: detailedItems
+    };
 };
