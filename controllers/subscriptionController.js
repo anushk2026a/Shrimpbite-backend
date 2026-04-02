@@ -9,7 +9,7 @@ import {
 export const subscribeToProduct = async (req, res) => {
     try {
         const userId = req.userId;
-        const { productId, frequency, customDays, quantity, startDate, endDate } = req.body;
+        const { productId, frequency, customDays, quantity, startDate, endDate, variantId, weightLabel } = req.body;
 
         const product = await Product.findById(productId);
         if (!product) {
@@ -45,7 +45,9 @@ export const subscribeToProduct = async (req, res) => {
             customDays,
             quantity,
             startDate: requestedStartDate,
-            endDate
+            endDate,
+            ...(variantId && variantId !== "null" ? { variantId } : {}),
+            ...(weightLabel && weightLabel !== "null" ? { weightLabel } : {})
         });
 
         res.status(201).json({
