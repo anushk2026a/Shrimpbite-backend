@@ -57,12 +57,17 @@ export const updateProduct = async (req, res) => {
             delete updateData.category;
         }
 
-        const product = await Product.findOneAndUpdate(
-            { _id: id, retailer: req.user._id },
-            { $set: updateData },
-            { new: true, runValidators: false } // runValidators:true has known issues with nested array subdocuments
-        );
+        // Use findById + save() — most reliable for nested subdocument arrays
+        const product = await Product.findOne({ _id: id, retailer: req.user._id });
         if (!product) return res.status(404).json({ success: false, message: "Product not found" });
+
+        // Explicitly assign each field so Mongoose tracks changes correctly
+        Object.keys(updateData).forEach(key => {
+            product[key] = updateData[key];
+        });
+
+        await product.save();
+
         res.status(200).json({ success: true, data: product });
     } catch (error) {
         res.status(500).json({ success: false, message: error.message });
