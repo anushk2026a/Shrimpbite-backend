@@ -114,6 +114,8 @@ export const getDailyPrepList = async (retailerId, dateString) => {
             addItemToRequirements({
                 product: sub.product,
                 quantity: sub.quantity,
+                variantId: sub.variantId,
+                weightLabel: sub.weightLabel,
             }, "Subscription", "Pending");
         }
     }

@@ -131,6 +131,8 @@ export const generateDailyOrders = async (targetDate = new Date()) => {
                     product: product._id,
                     retailer: sub.retailer,
                     quantity: sub.quantity,
+                    variantId: sub.variantId || undefined,
+                    weightLabel: sub.weightLabel || undefined,
                     price: product.price,
                     status: "Accepted"
                 }],
