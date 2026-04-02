@@ -131,8 +131,9 @@ export const placeOrder = async (req, res) => {
         // 6. Clear Cart
         await Cart.findOneAndDelete({ user: userId });
 
-        // 7. Socket Notification
-        await emitOrderUpdate(order.orderId, "Pending", order, identifiedRetailer, userId);
+        // 7. Socket Notification — populate first so product names are available in real-time
+        const populatedOrder = await Order.findById(order._id).populate("items.product", "name");
+        await emitOrderUpdate(order.orderId, "Pending", populatedOrder, identifiedRetailer, userId);
 
         // Create Notification for Retailer
         createNotification(identifiedRetailer.toString(), {
