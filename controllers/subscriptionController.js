@@ -183,6 +183,30 @@ export const updateSubscriptionStatus = async (req, res) => {
     }
 };
 
+export const updateAllSubscriptionStatus = async (req, res) => {
+    try {
+        const { status } = req.body;
+        
+        // Ownership check & Bulk update
+        // We only update subscriptions that aren't already Cancelled or in PendingCancellation
+        const result = await Subscription.updateMany(
+            { 
+                user: req.userId, 
+                status: { $nin: ["Cancelled", "PendingCancellation"] } 
+            },
+            { status }
+        );
+
+        res.status(200).json({
+            success: true,
+            message: `All active subscriptions have been ${status.toLowerCase()} successfully`,
+            updatedCount: result.modifiedCount
+        });
+    } catch (error) {
+        res.status(500).json({ success: false, message: error.message });
+    }
+};
+
 export const getSubscriptionPlans = async (req, res) => {
     try {
         const plans = await SubscriptionPlan.find();
