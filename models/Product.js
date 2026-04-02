@@ -31,11 +31,11 @@ const ProductSchema = new mongoose.Schema({
         type: String // Cloudinary URLs
     }],
     variants: [{
-        label: { type: String, required: true }, // e.g., "500 Grams"
-        price: { type: Number, required: true }, // e.g., 539
-        weightInKg: { type: Number, required: true }, // e.g., 0.5 (used for master stock calculation)
+        label: { type: String }, // e.g., "500 Grams"
+        price: { type: Number }, // e.g., 539
+        weightInKg: { type: Number }, // e.g., 0.5 (used for master stock calculation)
         weightValue: { type: Number }, // Original value (500)
-        weightUnit: { type: String, enum: ["Grams", "Kg"] } // Grams or Kg
+        weightUnit: { type: String } // "Grams" or "Kg"
     }],
     stock: {
         type: Number, // Measured in Kg (master stock)

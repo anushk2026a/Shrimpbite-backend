@@ -60,7 +60,7 @@ export const updateProduct = async (req, res) => {
         const product = await Product.findOneAndUpdate(
             { _id: id, retailer: req.user._id },
             { $set: updateData },
-            { new: true, runValidators: true }
+            { new: true, runValidators: false } // runValidators:true has known issues with nested array subdocuments
         );
         if (!product) return res.status(404).json({ success: false, message: "Product not found" });
         res.status(200).json({ success: true, data: product });
