@@ -69,7 +69,7 @@ export const getDailyPrepList = async (retailerId, dateString) => {
 
     const subscriptions = await Subscription.find({
         retailer: retailerId,
-        status: "Active",
+        status: { $in: ["Active", "PendingCancellation"] },
         startDate: { $lt: nextDay } 
     }).populate("product").populate("user");
 

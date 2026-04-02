@@ -7,31 +7,52 @@ import mongoose from "mongoose";
 import { createNotification } from "./notificationService.js";
 
 
-export const createSubscription = async (userId, subscriptionData) => {
-    // Basic validation: Check if product exists and user has min balance
-    const product = await Product.findById(subscriptionData.product);
-    if (!product) throw new Error("Product not found");
+export const cancelSubscription = async (id) => {
+    const sub = await Subscription.findById(id).populate('product');
+    if (!sub) throw new Error("Subscription not found");
 
-    const subscription = await Subscription.create({
-        user: userId,
-        ...subscriptionData,
-        retailer: product.retailer
-    });
+    // 1. Get current hour in IST
+    const istTime = new Intl.DateTimeFormat('en-US', {
+        timeZone: 'Asia/Kolkata',
+        hour: 'numeric',
+        hour12: false
+    }).format(new Date());
 
-    return subscription;
+    const currentHourIST = parseInt(istTime);
+
+    // Cutoff: 8 PM (20:00)
+    if (currentHourIST < 20) {
+        // [BEFORE 8 PM] Cancel immediately
+        sub.status = "Cancelled";
+        sub.cancelAtMidnight = false;
+        await sub.save();
+
+        // Notify retailer immediately so they remove it from prep list
+        const { emitOrderUpdate } = await import("./socketService.js");
+        emitOrderUpdate("SUB-CANCEL", "Cancelled", { subscriptionId: sub._id }, sub.retailer, sub.user);
+    } else {
+        // [AFTER 8 PM] Cancel after tonight's delivery (Grace period)
+        sub.status = "PendingCancellation";
+        sub.cancelAtMidnight = true;
+        await sub.save();
+    }
+
+    return sub;
 };
 
 export const generateDailyOrders = async (targetDate = new Date()) => {
     const dayNames = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
     const currentDayName = dayNames[targetDate.getDay()];
 
-    // 1. Find active subscriptions
-    const subscriptions = await Subscription.find({ status: "Active" }).populate("product");
+    // 1. Find active or pending cancellation subscriptions
+    const subscriptions = await Subscription.find({ 
+        status: { $in: ["Active", "PendingCancellation"] } 
+    }).populate("product");
 
     const stats = { created: 0, failed: 0, skipped: 0 };
 
     for (const sub of subscriptions) {
-        if (sub.status === "Paused") {
+        if (sub.status === "Paused" || (sub.status === "Cancelled" && !sub.cancelAtMidnight)) {
             stats.skipped++;
             continue;
         }
@@ -45,6 +66,7 @@ export const generateDailyOrders = async (targetDate = new Date()) => {
             const targetDay = new Date(targetDate);
             targetDay.setHours(0, 0, 0, 0);
 
+            // Frequency Checks
             if (sub.frequency === "Daily") {
                 shouldDeliver = true;
             } else if (sub.frequency === "Alternate Days") {
@@ -52,78 +74,39 @@ export const generateDailyOrders = async (targetDate = new Date()) => {
                 const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
                 if (diffDays % 2 === 0) shouldDeliver = true;
             } else if (sub.frequency === "Weekly") {
-                // Case-insensitive check for day names
                 if (sub.customDays && sub.customDays.some(d => d.toLowerCase() === currentDayName.toLowerCase())) {
                     shouldDeliver = true;
                 }
             }
 
+            // Vacation Check
             const isOnVacation = sub.vacationDates.some(vDate => {
                 const vacationDate = new Date(vDate);
                 vacationDate.setHours(0, 0, 0, 0);
                 return vacationDate.getTime() === targetDay.getTime();
             });
 
-            if (!shouldDeliver) {
-                console.log(`[SKIP] Frequency/Day Mismatch: Sub ${sub._id} (Freq: ${sub.frequency}, Days: ${sub.customDays}, Today: ${currentDayName})`);
-                stats.skipped++;
-                continue;
-            }
-
-            if (isOnVacation) {
-                console.log(`[SKIP] User on Vacation: Sub ${sub._id}`);
-                stats.skipped++;
-                continue;
-            }
-
-            // If start date is in the future (beyond today), skip
-            if (targetDay < subStart) {
-                console.log(`[SKIP] Future Start: Sub ${sub._id} (Starts: ${subStart.toDateString()}, Today: ${targetDay.toDateString()})`);
-                stats.skipped++;
-                continue;
-            }
-
-            const product = sub.product;
-            const dayStart = new Date(targetDate);
-            dayStart.setHours(0, 0, 0, 0);
-            const dayEnd = new Date(targetDate);
-            dayEnd.setHours(23, 59, 59, 999);
-
-            const todayOrdersCount = await Order.countDocuments({
-                "items.product": product._id,
-                subscriptionId: sub._id,
-                createdAt: { $gte: dayStart, $lt: dayEnd }
-            });
-
-            if (todayOrdersCount > 0) {
-                console.log(`[SKIP] Already Generated Today: Sub ${sub._id}`);
-                stats.skipped++;
-                continue;
-            }
-
-            if (product.dailyCapacity && todayOrdersCount >= product.dailyCapacity) {
-                console.log(`[SKIP] Capacity Reached: Product ${product.name}`);
+            if (!shouldDeliver || isOnVacation || targetDay < subStart) {
                 stats.skipped++;
                 continue;
             }
 
             // [NEW] Prevent multiple notifications/orders if job is triggered repeatedly
             if (sub.lastGeneratedDate && sub.lastGeneratedDate.toDateString() === targetDate.toDateString()) {
-                console.log(`[SKIP] Already processed for today: Sub ${sub._id}`);
                 stats.skipped++;
                 continue;
             }
 
-            // 5. Create Order & Debit Wallet
-            const amount = sub.product.price * sub.quantity;
+            const product = sub.product;
+            const amount = product.price * sub.quantity;
 
-            // Atomically debit wallet and create order
+            // 5. Debit Wallet and Create Order
             await adjustBalance(
                 sub.user,
                 "appUser",
                 amount,
                 "Debit",
-                `Subscription Delivery: ${sub.product.name}`,
+                `Subscription Delivery: ${product.name}`,
                 "Wallet",
                 sub._id
             );
@@ -133,11 +116,11 @@ export const generateDailyOrders = async (targetDate = new Date()) => {
                 orderId,
                 user: sub.user,
                 items: [{
-                    product: sub.product._id,
+                    product: product._id,
                     retailer: sub.retailer,
                     quantity: sub.quantity,
-                    price: sub.product.price,
-                    status: "Accepted" // Subscriptions are pre-accepted by the system
+                    price: product.price,
+                    status: "Accepted"
                 }],
                 totalAmount: amount,
                 orderType: "Subscription",
@@ -147,56 +130,37 @@ export const generateDailyOrders = async (targetDate = new Date()) => {
             });
 
             sub.lastGeneratedDate = targetDate;
-
-            // 6. Referral Reward Check (e.g., after 7 successful orders)
-            const subOrderCount = await Order.countDocuments({ subscriptionId: sub._id, paymentStatus: "Paid" });
-            if (subOrderCount === 7) {
-                import("./referralService.js").then(module => module.rewardReferral(sub.user));
+            
+            // Auto-finalise cancellation if it was pending
+            if (sub.cancelAtMidnight) {
+                sub.status = "Cancelled";
+                sub.cancelAtMidnight = false;
             }
-
-            // 7. Loyalty Points
-            import("./loyaltyService.js").then(module => module.awardLoyaltyPoints(sub.user, amount));
 
             await sub.save();
 
-            // 8. Socket Notification
-            if (newOrder && newOrder.items && newOrder.items.length > 0) {
-                // Include product name and subscription details in the data for better real-time display
-                const emitData = {
-                    ...newOrder.toObject(),
-                    product: `${sub.quantity}x ${sub.product.name}`,
-                    subscriptionDetails: {
-                        frequency: sub.frequency,
-                        customDays: sub.customDays
-                    },
-                    createdAt: newOrder.createdAt // Passing raw date for FE formatting
-                };
-                await emitOrderUpdate(newOrder.orderId, "Accepted", emitData, newOrder.items[0].retailer, sub.user);
-            }
+            // Notify retailer
+            await emitOrderUpdate(newOrder.orderId, "Accepted", {
+                ...newOrder.toObject(),
+                product: `${sub.quantity}x ${product.name}`,
+                subscriptionDetails: { frequency: sub.frequency, customDays: sub.customDays }
+            }, newOrder.items[0].retailer, sub.user);
 
             stats.created++;
 
-
         } catch (error) {
-            console.error(`Failed to generate order for subscription ${sub._id}:`, error.message);
+            console.error(`Failed sub ${sub._id}:`, error.message);
             stats.failed++;
-
-            // Notify user and flag as processed even if failed to prevent spam
+            
             if (error.message.includes("Insufficient wallet balance")) {
-                try {
-                    await createNotification(sub.user.toString(), {
-                        title: "Subscription Delivery Failed ⚠️",
-                        message: `Your scheduled delivery of "${sub.product.name}" wasn't processed today due to insufficient wallet balance. Please top up to resume regular deliveries.`,
-                        type: "System",
-                        referenceId: sub._id.toString()
-                    });
-
-                    // Update lastGeneratedDate even on failure to avoid duplicate notifications today
-                    sub.lastGeneratedDate = targetDate;
-                    await sub.save();
-                } catch (notifErr) {
-                    console.error("Failed to notify user/save sub state:", notifErr.message);
-                }
+                sub.lastGeneratedDate = targetDate;
+                await sub.save();
+                await createNotification(sub.user.toString(), {
+                    title: "Subscription Delivery Failed ⚠️",
+                    message: `Insufficient wallet balance for "${sub.product.name}". Delivery paused.`,
+                    type: "System",
+                    referenceId: sub._id.toString()
+                });
             }
         }
     }

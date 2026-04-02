@@ -1,7 +1,10 @@
 import Subscription from "../models/Subscription.js";
 import Product from "../models/Product.js";
 import SubscriptionPlan from "../models/SubscriptionPlan.js";
-import { createSubscription as createSubService } from "../services/subscriptionService.js";
+import { 
+    createSubscription as createSubService, 
+    cancelSubscription as cancelSubService 
+} from "../services/subscriptionService.js";
 
 export const subscribeToProduct = async (req, res) => {
     try {
@@ -125,6 +128,32 @@ export const updateVacation = async (req, res) => {
             success: true,
             message: "Vacation dates updated successfully",
             subscription
+        });
+    } catch (error) {
+        res.status(500).json({ success: false, message: error.message });
+    }
+};
+
+export const cancelSubscription = async (req, res) => {
+    try {
+        const { subscriptionId } = req.body;
+        
+        // Ownership check
+        const sub = await Subscription.findOne({ _id: subscriptionId, user: req.userId });
+        if (!sub) {
+            return res.status(404).json({ success: false, message: "Subscription not found or unauthorized" });
+        }
+
+        const result = await cancelSubService(subscriptionId);
+        
+        const message = result.status === "Cancelled" 
+            ? "Subscription cancelled successfully. No further deliveries will be scheduled."
+            : "Cut-off (8 PM) passed. Your subscription will be cancelled after tonight's final delivery.";
+
+        res.status(200).json({
+            success: true,
+            message,
+            subscription: result
         });
     } catch (error) {
         res.status(500).json({ success: false, message: error.message });

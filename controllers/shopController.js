@@ -463,7 +463,7 @@ export const getRetailerOrders = async (req, res) => {
         const orders = await Order.find(query)
             .populate("items.product", "name")
             .populate("rider", "name")
-            .populate("subscriptionId", "frequency customDays")
+            .populate("subscriptionId", "frequency customDays cancelAtMidnight")
             .sort({ createdAt: -1 });
 
         // Calculate Stats
@@ -515,7 +515,8 @@ export const getRetailerOrders = async (req, res) => {
                 rider: order.rider,
                 subscriptionDetails: order.subscriptionId ? {
                     frequency: order.subscriptionId.frequency,
-                    customDays: order.subscriptionId.customDays
+                    customDays: order.subscriptionId.customDays,
+                    isLastDelivery: order.subscriptionId.cancelAtMidnight
                 } : null,
                 statusHistory: order.statusHistory
             });
