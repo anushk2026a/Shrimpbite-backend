@@ -28,6 +28,7 @@ const app = express()
 // Middleware
 const allowedOrigins = [
     "http://localhost:3000",
+    "http://127.0.0.1:3000",
     "http://16.16.9.58:5000",
     "https://shrimpbite-admin.vercel.app",
     "https://shrimpbite-retailer.vercel.app"
@@ -35,7 +36,8 @@ const allowedOrigins = [
 
 app.use(cors({
     origin: function (origin, callback) {
-        if (!origin || allowedOrigins.indexOf(origin) !== -1) {
+        // [MODIFIED] Allow all localhost requests during development
+        if (!origin || allowedOrigins.indexOf(origin) !== -1 || origin.startsWith("http://localhost:")) {
             callback(null, true);
         } else {
             callback(new Error("Not allowed by CORS"));
@@ -43,7 +45,8 @@ app.use(cors({
     },
     credentials: true,
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-    allowedHeaders: ["Content-Type", "Authorization", "x-cron-secret"]
+    allowedHeaders: ["Content-Type", "Authorization", "x-cron-secret", "x-requested-with"],
+    optionsSuccessStatus: 200
 }));
 
 app.use(express.json())
