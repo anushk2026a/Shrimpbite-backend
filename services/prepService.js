@@ -14,6 +14,8 @@ export const getDailyPrepList = async (retailerId, dateString) => {
     const isFuture = targetDate > today;
     const requirements = {};
 
+    const targetDateISO = targetDate.toISOString().split('T')[0];
+
     const addItemToRequirements = (item, type, status = "Pending") => {
         if (!item.product) return;
         const prodId = item.product._id.toString();
@@ -42,75 +44,81 @@ export const getDailyPrepList = async (retailerId, dateString) => {
         }
     };
 
-    if (isFuture) {
-        // PREDICTIVE MODE: Analyze active subscriptions
-        const dayNames = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
-        const targetDayName = dayNames[targetDate.getDay()];
+    // 1. Gather all existing orders for this date
+    const orders = await Order.find({
+        "items.retailer": retailerId,
+        createdAt: { $gte: targetDate, $lt: nextDay },
+        status: { $nin: ["Cancelled"] }
+    }).populate("items.product");
 
-        // Broaden the search by using nextDay so we don't miss subscriptions starting throughout the targetDay
-        const subscriptions = await Subscription.find({
-            retailer: retailerId,
-            status: "Active",
-            startDate: { $lt: nextDay } 
-        }).populate("product");
+    const existingSubIds = new Set(orders.filter(o => o.orderType === "Subscription").map(o => o.subscriptionId?.toString()));
 
-        for (const sub of subscriptions) {
-            let shouldDeliver = false;
-            
-            // Normalize dates to start of day for accurate comparison
-            const subStart = new Date(sub.startDate);
-            subStart.setHours(0, 0, 0, 0);
-            const target = new Date(targetDate);
-            target.setHours(0, 0, 0, 0);
+    // 2. Process existing orders first
+    orders.forEach(order => {
+        order.items.forEach(item => {
+            if (item.retailer && item.retailer.toString() === retailerId.toString()) {
+                addItemToRequirements(item, order.orderType, item.status);
+            }
+        });
+    });
 
-            // Frequency Logic
-            if (sub.frequency === "Daily") {
+    // 3. Predictive Mode: Add active subscriptions that DON'T have an order yet (or are in the future)
+    const dayNames = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+    const targetDayName = dayNames[targetDate.getDay()];
+
+    const subscriptions = await Subscription.find({
+        retailer: retailerId,
+        status: "Active",
+        startDate: { $lt: nextDay } 
+    }).populate("product");
+
+    for (const sub of subscriptions) {
+        // If an order already exists for today, skip it (already handled in step 2)
+        if (!isFuture && existingSubIds.has(sub._id.toString())) {
+            continue;
+        }
+
+        let shouldDeliver = false;
+        
+        // Date comparison logic
+        const subStart = new Date(sub.startDate);
+        subStart.setHours(0, 0, 0, 0);
+        const target = new Date(targetDate);
+        target.setHours(0, 0, 0, 0);
+
+        // Frequency Logic
+        if (sub.frequency === "Daily") {
+            shouldDeliver = true;
+        } else if (sub.frequency === "Alternate Days") {
+            const diffTime = Math.abs(target - subStart);
+            const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
+            if (diffDays % 2 === 0) shouldDeliver = true;
+        } else if (sub.frequency === "Weekly") {
+            if (sub.customDays && sub.customDays.some(d => d.toLowerCase() === targetDayName.toLowerCase())) {
                 shouldDeliver = true;
-            } else if (sub.frequency === "Alternate Days") {
-                const diffTime = Math.abs(target - subStart);
-                const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
-                if (diffDays % 2 === 0) shouldDeliver = true;
-            } else if (sub.frequency === "Weekly") {
-                if (sub.customDays && sub.customDays.some(d => d.toLowerCase() === targetDayName.toLowerCase())) {
-                    shouldDeliver = true;
-                }
-            }
-
-            // Vacation Check
-            const isOnVacation = sub.vacationDates && sub.vacationDates.some(vDate => {
-                const vacationDate = new Date(vDate);
-                vacationDate.setHours(0, 0, 0, 0);
-                return vacationDate.getTime() === target.getTime();
-            });
-
-            // Ensure the subscription has actually started relative to the target day
-            if (target < subStart) {
-                shouldDeliver = false;
-            }
-
-            if (shouldDeliver && !isOnVacation) {
-                addItemToRequirements({
-                    product: sub.product,
-                    quantity: sub.quantity,
-                }, "Subscription", "Pending");
             }
         }
-    } else {
-        // ACTUAL MODE: Use existing orders
-        const orders = await Order.find({
-            "items.retailer": retailerId,
-            createdAt: { $gte: targetDate, $lt: nextDay },
-            status: { $nin: ["Cancelled"] }
-        }).populate("items.product");
 
-        orders.forEach(order => {
-            order.items.forEach(item => {
-                if (item.retailer && item.retailer.toString() === retailerId.toString()) {
-                    addItemToRequirements(item, order.orderType, item.status);
-                }
-            });
+        // Hardened Vacation Check: Use ISO String comparison to avoid timezone drift
+        const isOnVacation = sub.vacationDates && sub.vacationDates.some(vDate => {
+            const vString = new Date(vDate).toISOString().split('T')[0];
+            return vString === targetDateISO;
         });
+
+        // Start Date check
+        if (target < subStart) {
+            shouldDeliver = false;
+        }
+
+        if (shouldDeliver && !isOnVacation) {
+            addItemToRequirements({
+                product: sub.product,
+                quantity: sub.quantity,
+            }, "Subscription", "Pending");
+        }
     }
+
+    return Object.values(requirements);
 
     return Object.values(requirements);
 };
