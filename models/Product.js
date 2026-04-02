@@ -14,14 +14,6 @@ const ProductSchema = new mongoose.Schema({
         type: Number,
         required: false // Optional if variants exist
     },
-    // silverPrice: {
-    //     type: Number,
-    //     default: 0
-    // },
-    // goldPrice: {
-    //     type: Number,
-    //     default: 0
-    // },
     category: {
         type: mongoose.Schema.Types.ObjectId,
         ref: "Category",
