@@ -6,6 +6,13 @@ const cartItemSchema = new mongoose.Schema({
         ref: "Product",
         required: true
     },
+    variantId: {
+        type: mongoose.Schema.Types.ObjectId, // Refers to the variant in the Product variants array
+        required: false 
+    },
+    weightLabel: {
+        type: String // e.g. "500 Grams"
+    },
     quantity: {
         type: Number,
         required: true,

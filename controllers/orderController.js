@@ -38,11 +38,22 @@ export const placeOrder = async (req, res) => {
         let identifiedRetailer = cart.retailer; // Initial identifier
 
         for (const item of cart.items) {
-            const currentPrice = item.product.price; 
-            if (item.product.stock < item.quantity) {
+            let weightToReduce = item.quantity; // Default as 1kg per unit
+            let currentPrice = item.product.price;
+
+            // VARIANT LOGIC: If a variant was selected, use its weight and price
+            if (item.variantId && item.product.variants && item.product.variants.length > 0) {
+                const variant = item.product.variants.id(item.variantId);
+                if (variant) {
+                    weightToReduce = variant.weightInKg * item.quantity;
+                    currentPrice = variant.price;
+                }
+            }
+
+            if (item.product.stock < weightToReduce) {
                 return res.status(400).json({
                     success: false,
-                    message: `Not enough stock for ${item.product.name}. Available: ${item.product.stock}kg`
+                    message: `Not enough stock for ${item.product.name}. Required: ${weightToReduce}kg, Available: ${item.product.stock}kg`
                 });
             }
 
@@ -53,11 +64,16 @@ export const placeOrder = async (req, res) => {
             totalAmount += currentPrice * item.quantity;
             orderItems.push({
                 product: item.product._id,
+                variantId: item.variantId, // Track which weight was picked
+                weightLabel: item.weightLabel,
                 retailer: itemRetailer,
                 quantity: item.quantity,
                 price: currentPrice,
                 status: "Pending"
             });
+
+            // Store weightToReduce for the final loop
+            item.calculatedWeightToReduce = weightToReduce;
         }
 
         if (!identifiedRetailer) {
@@ -68,12 +84,9 @@ export const placeOrder = async (req, res) => {
         if (paymentMethod === "Wallet") {
             const user = await AppUser.findById(userId);
             if (!user || user.walletBalance < totalAmount) {
-                const cartSummary = cart.items.map(i => `${i.quantity}x ${i.product.name} (@₹${i.product.price})`).join(", ");
-                console.log(`[PAYMENT_FAILED] User ${userId} insufficient balance. Total: ₹${totalAmount}, Balance: ₹${user?.walletBalance}, Items: ${cartSummary}`);
-
                 return res.status(400).json({
                     success: false,
-                    message: `Insufficient wallet balance. Total: ₹${totalAmount}, Current: ₹${user?.walletBalance || 0}. (Items: ${cart.items.length})`
+                    message: `Insufficient wallet balance. Total: ₹${totalAmount}, Current: ₹${user?.walletBalance || 0}.`
                 });
             }
 
@@ -98,9 +111,10 @@ export const placeOrder = async (req, res) => {
 
         // 5. Update Stock & Check for Low Inventory
         for (const item of cart.items) {
+            const weightToReduce = item.calculatedWeightToReduce || item.quantity;
             const updatedProduct = await Product.findByIdAndUpdate(
                 item.product._id,
-                { $inc: { stock: -item.quantity } },
+                { $inc: { stock: -weightToReduce } },
                 { new: true }
             );
 
