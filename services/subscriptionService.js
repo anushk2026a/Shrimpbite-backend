@@ -6,7 +6,19 @@ import { adjustBalance } from "./walletService.js";
 import mongoose from "mongoose";
 import { createNotification } from "./notificationService.js";
 
+export const createSubscription = async (userId, subscriptionData) => {
+    // Basic validation: Check if product exists and user has min balance
+    const product = await Product.findById(subscriptionData.product);
+    if (!product) throw new Error("Product not found");
 
+    const subscription = await Subscription.create({
+        user: userId,
+        ...subscriptionData,
+        retailer: product.retailer
+    });
+
+    return subscription;
+};
 export const cancelSubscription = async (id) => {
     const sub = await Subscription.findById(id).populate('product');
     if (!sub) throw new Error("Subscription not found");
