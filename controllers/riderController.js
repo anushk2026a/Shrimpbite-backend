@@ -205,10 +205,14 @@ export const addRider = async (req, res) => {
         const existingUser = await User.findOne({ phone });
         if (existingUser) return res.status(400).json({ success: false, message: "A user with this phone number already exists" });
 
+        // Generate a random internal email to bypass the unique+sparse email indexing on User model
+        const internalEmail = `rider_${phone}_${Date.now()}@shrimpbite.internal`;
+
         // Create User account
         const user = new User({
             name,
             phone,
+            email: internalEmail,
             role: "rider",
             status: "approved"
         });
