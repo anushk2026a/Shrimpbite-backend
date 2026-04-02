@@ -3,13 +3,28 @@ import Product from "../models/Product.js";
 
 export const addToCart = async (req, res) => {
     try {
-        const { productId, quantity } = req.body;
+        const { productId, quantity, variantId, weightLabel } = req.body;
         const userId = req.userId;
 
         const product = await Product.findById(productId);
 
         if (!product) {
             return res.status(404).json({ message: "Product not found" });
+        }
+
+        // Resolve price: use variant price if variantId provided, else flat price
+        let resolvedPrice = product.price;
+        let resolvedVariantId = null;
+        let resolvedWeightLabel = null;
+
+        if (variantId) {
+            const variant = product.variants.find(v => v._id.toString() === variantId.toString());
+            if (!variant) {
+                return res.status(400).json({ message: "Selected variant not found on this product" });
+            }
+            resolvedPrice = variant.price;
+            resolvedVariantId = variant._id;
+            resolvedWeightLabel = weightLabel || variant.label;
         }
 
         let cart = await Cart.findOne({ user: userId });
@@ -29,8 +44,10 @@ export const addToCart = async (req, res) => {
             });
         }
 
-        const existingItem = cart.items.find(
-            item => item.product.toString() === productId
+        // Match by product AND variant (same product, different weight = different cart item)
+        const existingItem = cart.items.find(item =>
+            item.product.toString() === productId &&
+            (item.variantId?.toString() || null) === (resolvedVariantId?.toString() || null)
         );
 
         if (existingItem) {
@@ -41,7 +58,7 @@ export const addToCart = async (req, res) => {
                 });
             }
             existingItem.quantity = newQuantity;
-            existingItem.price = product.price; // Update to latest price
+            existingItem.price = resolvedPrice;
         } else {
             if (quantity > product.stock) {
                 return res.status(400).json({
@@ -51,7 +68,9 @@ export const addToCart = async (req, res) => {
             cart.items.push({
                 product: productId,
                 quantity,
-                price: product.price
+                price: resolvedPrice,
+                variantId: resolvedVariantId,
+                weightLabel: resolvedWeightLabel
             });
         }
 
