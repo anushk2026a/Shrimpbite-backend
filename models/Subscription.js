@@ -30,6 +30,11 @@ const subscriptionSchema = new mongoose.Schema({
         required: true,
         min: 1
     },
+    variantId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "Product.variants" // Reference the specific variant
+    },
+    weightLabel: String, // Label like "500 Grams" (stored as snapshot)
     status: {
         type: String,
         enum: ["Active", "Paused", "Cancelled", "PendingCancellation"],

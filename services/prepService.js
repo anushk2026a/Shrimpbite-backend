@@ -19,13 +19,19 @@ export const getDailyPrepList = async (retailerId, dateString) => {
     const addItemToRequirements = (item, type, status = "Pending") => {
         if (!item.product) return;
         const prodId = item.product._id.toString();
+        
+        // Find if this is a variant-based order
+        const variant = item.product.variants?.find(v => v._id?.toString() === item.variantId?.toString());
+        const weightToSum = variant ? variant.weightInKg : 1.0; // Default to 1kg if no variant
+
         if (!requirements[prodId]) {
             requirements[prodId] = {
                 id: prodId,
                 productName: item.product.name,
                 category: item.product.category || "Uncategorized",
-                quantity: 0,
-                unit: item.product.unit || "kg",
+                quantity: 0, // This is count (how many packs)
+                totalWeight: 0, // This is actual kilos to prepare
+                unit: "kg",
                 orderCount: 0,
                 subscriptionCount: 0,
                 oneTimeCount: 0,
@@ -34,6 +40,7 @@ export const getDailyPrepList = async (retailerId, dateString) => {
             };
         }
         requirements[prodId].quantity += item.quantity;
+        requirements[prodId].totalWeight += (weightToSum * item.quantity);
         requirements[prodId].orderCount += 1;
         if (type === "Subscription") requirements[prodId].subscriptionCount += 1;
         else requirements[prodId].oneTimeCount += 1;
@@ -130,7 +137,8 @@ export const getDailyPrepList = async (retailerId, dateString) => {
                     productId: item.product._id,
                     productName: item.product.name,
                     quantity: item.quantity,
-                    unit: item.product.unit || "kg",
+                    weightLabel: item.weightLabel || "",
+                    unit: "kg",
                     status: item.status,
                     frequency: sub?.frequency || "Subscription",
                     customDays: sub?.customDays || [],
@@ -178,7 +186,8 @@ export const getDailyPrepList = async (retailerId, dateString) => {
                 productId: sub.product._id,
                 productName: sub.product.name,
                 quantity: sub.quantity,
-                unit: sub.product.unit || "kg",
+                weightLabel: sub.weightLabel || "",
+                unit: "kg",
                 status: "Pending",
                 frequency: sub.frequency,
                 customDays: sub.customDays,

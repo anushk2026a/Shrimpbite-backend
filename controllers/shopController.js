@@ -483,7 +483,8 @@ export const getRetailerOrders = async (req, res) => {
 
             retailerItems.forEach(item => {
                 retailerOrderTotal += item.price * item.quantity;
-                productNames.push(`${item.quantity}x ${item.product?.name || 'Unknown Product'}`);
+                const weightTag = item.weightLabel ? ` (${item.weightLabel})` : "";
+                productNames.push(`${item.quantity}x ${item.product?.name || 'Unknown Product'}${weightTag}`);
             });
 
             totalRevenue += retailerOrderTotal;
