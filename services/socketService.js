@@ -252,3 +252,14 @@ export const emitPayoutUpdate = (payoutData) => {
         io.emit("payoutUpdate", payoutData); 
     }
 };
+
+export const emitWalletUpdate = (userId, newBalance) => {
+    const room = `user_${userId.toString()}`;
+    const payload = { balance: newBalance };
+
+    _log("Emitting Wallet Update", { data: { room, balance: newBalance } });
+
+    if (io) {
+        io.to(room).emit("walletUpdate", payload);
+    }
+};

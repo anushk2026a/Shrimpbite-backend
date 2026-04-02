@@ -2,6 +2,7 @@ import Transaction from "../models/Transaction.js";
 import AppUser from "../models/AppUser.js";
 import User from "../models/User.js";
 import mongoose from "mongoose";
+import { emitWalletUpdate } from "./socketService.js";
 
 export const adjustBalance = async (userId, userType, amount, type, description, source, referenceId = null) => {
     const session = await mongoose.startSession();
@@ -34,6 +35,12 @@ export const adjustBalance = async (userId, userType, amount, type, description,
         }], { session });
 
         await session.commitTransaction();
+
+        // [NEW] Real-time Wallet Sync for Flutter App
+        if (userType === "appUser") {
+            emitWalletUpdate(userId, newBalance);
+        }
+
         return { success: true, newBalance, transaction: transaction[0] };
     } catch (error) {
         await session.abortTransaction();
