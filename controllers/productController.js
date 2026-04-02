@@ -59,7 +59,7 @@ export const updateProduct = async (req, res) => {
 
         const product = await Product.findOneAndUpdate(
             { _id: id, retailer: req.user._id },
-            updateData,
+            { $set: updateData },
             { new: true, runValidators: true }
         );
         if (!product) return res.status(404).json({ success: false, message: "Product not found" });
