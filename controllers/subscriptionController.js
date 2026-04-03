@@ -191,6 +191,13 @@ export const updateAllSubscriptionStatus = async (req, res) => {
         
         // Ownership check & Bulk update
         // We only update subscriptions that aren't already Cancelled or in PendingCancellation
+        // First find affected to notify retailers
+        const subscriptions = await Subscription.find({
+            user: req.userId,
+            status: { $nin: ["Cancelled", "PendingCancellation"] }
+        });
+        const retailers = [...new Set(subscriptions.map(s => s.retailer?.toString()).filter(Boolean))];
+
         const result = await Subscription.updateMany(
             { 
                 user: req.userId, 
@@ -198,6 +205,13 @@ export const updateAllSubscriptionStatus = async (req, res) => {
             },
             { status }
         );
+
+        if (result.modifiedCount > 0 && retailers.length > 0) {
+            const { emitOrderUpdate } = await import("../services/socketService.js");
+            retailers.forEach(retailerId => {
+                emitOrderUpdate("SUB-STATUS-ALL", `Status changed to ${status}`, { userId: req.userId }, retailerId, req.userId);
+            });
+        }
 
         res.status(200).json({
             success: true,
@@ -211,24 +225,44 @@ export const updateAllSubscriptionStatus = async (req, res) => {
 
 export const updateAllVacationDate = async (req, res) => {
     try {
-        const { date } = req.body;
+        const { date, action = "add" } = req.body;
         if (!date) {
             return res.status(400).json({ success: false, message: "Date is required" });
         }
 
-        const dateToAdd = new Date(date);
+        const dateObj = new Date(date);
+        
+        let updateQuery = {};
+        if (action === "remove") {
+            updateQuery = { $pull: { vacationDates: dateObj } };
+        } else {
+            updateQuery = { $addToSet: { vacationDates: dateObj } };
+        }
+
+        const subscriptions = await Subscription.find({
+            user: req.userId,
+            status: { $nin: ["Cancelled", "PendingCancellation"] }
+        });
+        const retailers = [...new Set(subscriptions.map(s => s.retailer?.toString()).filter(Boolean))];
 
         const result = await Subscription.updateMany(
             { 
                 user: req.userId, 
                 status: { $nin: ["Cancelled", "PendingCancellation"] } 
             },
-            { $addToSet: { vacationDates: dateToAdd } }
+            updateQuery
         );
+
+        if (result.modifiedCount > 0 && retailers.length > 0) {
+            const { emitOrderUpdate } = await import("../services/socketService.js");
+            retailers.forEach(retailerId => {
+                emitOrderUpdate("SUB-VACATION-ALL", "Vacation Date Changed", { userId: req.userId, date }, retailerId, req.userId);
+            });
+        }
 
         res.status(200).json({
             success: true,
-            message: `Successfully added vacation date for all active subscriptions`,
+            message: `Successfully ${action === "remove" ? 'resumed' : 'skipped'} deliveries for ${date} on active subscriptions`,
             updatedCount: result.modifiedCount
         });
     } catch (error) {
