@@ -76,7 +76,7 @@ export const getDailyPrepList = async (retailerId, dateString) => {
 
     const subscriptions = await Subscription.find({
         retailer: retailerId,
-        status: { $in: ["Active", "PendingCancellation"] },
+        status: { $in: ["Active", "PendingCancellation", "Paused"] },
         startDate: { $lt: nextDay } 
     }).populate("product").populate("user");
 
@@ -110,13 +110,24 @@ export const getDailyPrepList = async (retailerId, dateString) => {
 
         if (target < subStart) shouldDeliver = false;
 
-        if (shouldDeliver && !isOnVacation) {
-            addItemToRequirements({
-                product: sub.product,
-                quantity: sub.quantity,
-                variantId: sub.variantId,
-                weightLabel: sub.weightLabel,
-            }, "Subscription", "Pending");
+        if (shouldDeliver) {
+            // Determine display status for the UI
+            let displayStatus = "Pending";
+            if (sub.status === "Paused") {
+                displayStatus = "Paused";
+            } else if (isOnVacation) {
+                displayStatus = "On Vacation";
+            }
+
+            // Only add to summary totals if it actually needs to be prepared
+            if (displayStatus === "Pending") {
+                addItemToRequirements({
+                    product: sub.product,
+                    quantity: sub.quantity,
+                    variantId: sub.variantId,
+                    weightLabel: sub.weightLabel,
+                }, "Subscription", "Pending");
+            }
         }
     }
 
@@ -180,7 +191,15 @@ export const getDailyPrepList = async (retailerId, dateString) => {
 
         if (target < subStart) shouldDeliver = false;
 
-        if (shouldDeliver && !isOnVacation) {
+        if (shouldDeliver) {
+            // Determine display status for the UI
+            let displayStatus = "Pending";
+            if (sub.status === "Paused") {
+                displayStatus = "Paused";
+            } else if (isOnVacation) {
+                displayStatus = "On Vacation";
+            }
+
             detailedItems.push({
                 id: "PRE-" + sub._id,
                 orderId: "WAITING-BILLING",
@@ -190,7 +209,7 @@ export const getDailyPrepList = async (retailerId, dateString) => {
                 quantity: sub.quantity,
                 weightLabel: sub.weightLabel || "",
                 unit: "kg",
-                status: "Pending",
+                status: displayStatus,
                 frequency: sub.frequency,
                 customDays: sub.customDays,
                 isLastDelivery: sub.status === "PendingCancellation"
