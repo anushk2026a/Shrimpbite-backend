@@ -1,6 +1,6 @@
 import express from "express";
 import protectAppUser from "../middleware/appAuthMiddleware.js";
-import { subscribeToProduct, getMySubscriptions, updateSubscriptionStatus, updateAllSubscriptionStatus, updateVacation, cancelSubscription } from "../controllers/subscriptionController.js";
+import { subscribeToProduct, getMySubscriptions, updateSubscriptionStatus, updateAllSubscriptionStatus, updateVacation, cancelSubscription, updateAllVacationDate } from "../controllers/subscriptionController.js";
 
 const router = express.Router();
 
@@ -12,5 +12,6 @@ router.post("/cancel", cancelSubscription);
 router.patch("/status", updateSubscriptionStatus);
 router.patch("/status-all", updateAllSubscriptionStatus);
 router.post("/vacation", updateVacation);
+router.patch("/vacation-all-date", updateAllVacationDate);
 
 export default router;

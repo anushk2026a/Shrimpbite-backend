@@ -209,6 +209,33 @@ export const updateAllSubscriptionStatus = async (req, res) => {
     }
 };
 
+export const updateAllVacationDate = async (req, res) => {
+    try {
+        const { date } = req.body;
+        if (!date) {
+            return res.status(400).json({ success: false, message: "Date is required" });
+        }
+
+        const dateToAdd = new Date(date);
+
+        const result = await Subscription.updateMany(
+            { 
+                user: req.userId, 
+                status: { $nin: ["Cancelled", "PendingCancellation"] } 
+            },
+            { $addToSet: { vacationDates: dateToAdd } }
+        );
+
+        res.status(200).json({
+            success: true,
+            message: `Successfully added vacation date for all active subscriptions`,
+            updatedCount: result.modifiedCount
+        });
+    } catch (error) {
+        res.status(500).json({ success: false, message: error.message });
+    }
+};
+
 export const getSubscriptionPlans = async (req, res) => {
     try {
         const plans = await SubscriptionPlan.find();
