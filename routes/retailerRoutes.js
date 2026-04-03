@@ -41,7 +41,7 @@ router.get("/reviews", protect, retailerOnly, getRetailerReviews);
 router.get("/prep-list", protect, retailerOnly, async (req, res) => {
     try {
         const { date } = req.query;
-        const requirements = await getDailyPrepList(req.user.id, date);
+        const requirements = await getDailyPrepList(req.userId, date);
         res.status(200).json({ success: true, data: requirements });
     } catch (error) {
         res.status(500).json({ success: false, message: error.message });
