@@ -157,7 +157,8 @@ export const getDailyPrepList = async (retailerId, dateString) => {
                     status: item.status,
                     frequency: sub?.frequency || "Subscription",
                     customDays: sub?.customDays || [],
-                    isLastDelivery: sub?.status === "PendingCancellation"
+                    isLastDelivery: sub?.status === "PendingCancellation",
+                    pauseMetrics: null
                 });
             }
         });
@@ -196,11 +197,37 @@ export const getDailyPrepList = async (retailerId, dateString) => {
         if (shouldDeliver) {
             // Determine display status for the UI
             let displayStatus = "Pending";
+            let pauseMetrics = null;
+            
             if (sub.status === "Paused") {
                 displayStatus = "Paused";
+                pauseMetrics = {
+                    type: "Indefinite Pause",
+                    duration: "Until Resumed",
+                    resumeDate: "Manual"
+                };
             } else if (isOnVacation) {
                 const [yyyy, mm, dd] = targetDateISO.split('-');
                 displayStatus = `Paused for ${dd}/${mm}`;
+                
+                let resumeDate = "N/A";
+                let durationDays = sub.vacationDates?.length || 1;
+                
+                if (sub.vacationDates && sub.vacationDates.length > 0) {
+                    const sorted = [...sub.vacationDates].sort((a,b) => new Date(a) - new Date(b));
+                    const lastDate = new Date(sorted[sorted.length-1]);
+                    lastDate.setDate(lastDate.getDate() + 1);
+                    
+                    const rDay = String(lastDate.getDate()).padStart(2, '0');
+                    const rMonth = String(lastDate.getMonth() + 1).padStart(2, '0');
+                    resumeDate = `${rDay}/${rMonth}`;
+                }
+
+                pauseMetrics = {
+                    type: "Scheduled Vacation",
+                    duration: `${durationDays} Day(s)`,
+                    resumeDate: resumeDate
+                };
             }
 
             detailedItems.push({
@@ -215,7 +242,8 @@ export const getDailyPrepList = async (retailerId, dateString) => {
                 status: displayStatus,
                 frequency: sub.frequency,
                 customDays: sub.customDays,
-                isLastDelivery: sub.status === "PendingCancellation"
+                isLastDelivery: sub.status === "PendingCancellation",
+                pauseMetrics
             });
         }
     }
