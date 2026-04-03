@@ -116,7 +116,9 @@ export const getDailyPrepList = async (retailerId, dateString) => {
             if (sub.status === "Paused") {
                 displayStatus = "Paused";
             } else if (isOnVacation) {
-                displayStatus = "On Vacation";
+                // Using DD/MM format
+                const [yyyy, mm, dd] = targetDateISO.split('-');
+                displayStatus = `Paused for ${dd}/${mm}`;
             }
 
             // Only add to summary totals if it actually needs to be prepared
@@ -197,7 +199,8 @@ export const getDailyPrepList = async (retailerId, dateString) => {
             if (sub.status === "Paused") {
                 displayStatus = "Paused";
             } else if (isOnVacation) {
-                displayStatus = "On Vacation";
+                const [yyyy, mm, dd] = targetDateISO.split('-');
+                displayStatus = `Paused for ${dd}/${mm}`;
             }
 
             detailedItems.push({
