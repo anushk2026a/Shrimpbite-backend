@@ -519,7 +519,14 @@ export const getRetailerOrders = async (req, res) => {
                     customDays: order.subscriptionId.customDays,
                     isLastDelivery: order.subscriptionId.cancelAtMidnight
                 } : null,
-                statusHistory: order.statusHistory
+                statusHistory: order.statusHistory,
+                // Include per-item breakdown so the detail panel can show exact weight labels
+                items: retailerItems.map(item => ({
+                    name: item.product?.name || "Unknown Product",
+                    weightLabel: item.weightLabel || null,
+                    quantity: item.quantity,
+                    price: item.price
+                }))
             });
         });
 

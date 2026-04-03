@@ -38,16 +38,29 @@ export const placeOrder = async (req, res) => {
         let identifiedRetailer = cart.retailer; // Initial identifier
 
         for (const item of cart.items) {
-            let weightToReduce = item.quantity; // Default as 1kg per unit
+            let weightToReduce = item.quantity; // Default as 1kg per unit (for flat-price products only)
             let currentPrice = item.product.price;
 
-            // VARIANT LOGIC: If a variant was selected, use its weight and price
-            if (item.variantId && item.product.variants && item.product.variants.length > 0) {
-                const variant = item.product.variants.id(item.variantId);
-                if (variant) {
-                    weightToReduce = variant.weightInKg * item.quantity;
-                    currentPrice = variant.price;
+            // VARIANT LOGIC: If product has variants, variantId is MANDATORY
+            if (item.product.variants && item.product.variants.length > 0) {
+                if (!item.variantId) {
+                    // Safety guard: reject order if no variant was selected for a variant-product
+                    // This prevents wrong stock deduction (e.g. deducting 1kg instead of 0.5kg)
+                    return res.status(400).json({
+                        success: false,
+                        message: `Weight option not selected for "${item.product.name}". Please re-add it to your cart with a valid weight.`
+                    });
                 }
+                const variant = item.product.variants.id(item.variantId);
+                if (!variant) {
+                    return res.status(400).json({
+                        success: false,
+                        message: `Selected weight option for "${item.product.name}" is no longer available. Please update your cart.`
+                    });
+                }
+                // Correct deduction: e.g. 500g order → 0.5kg deducted from master stock
+                weightToReduce = variant.weightInKg * item.quantity;
+                currentPrice = variant.price;
             }
 
             if (item.product.stock < weightToReduce) {

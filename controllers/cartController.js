@@ -16,8 +16,15 @@ export const addToCart = async (req, res) => {
         let resolvedPrice = product.price;
         let resolvedVariantId = null;
         let resolvedWeightLabel = null;
+        let resolvedWeightInKg = null; // Used for accurate stock check
 
-        if (variantId) {
+        if (product.variants && product.variants.length > 0) {
+            // This product HAS variants — variantId is REQUIRED
+            if (!variantId) {
+                return res.status(400).json({
+                    message: `Please select a weight option for "${product.name}" before adding to cart.`
+                });
+            }
             const variant = product.variants.find(v => v._id.toString() === variantId.toString());
             if (!variant) {
                 return res.status(400).json({ message: "Selected variant not found on this product" });
@@ -25,6 +32,10 @@ export const addToCart = async (req, res) => {
             resolvedPrice = variant.price;
             resolvedVariantId = variant._id;
             resolvedWeightLabel = weightLabel || variant.label;
+            resolvedWeightInKg = variant.weightInKg; // e.g. 0.5 for 500g
+        } else if (variantId) {
+            // variantId sent but product has no variants — ignore gracefully
+            resolvedPrice = product.price;
         }
 
         let cart = await Cart.findOne({ user: userId });
@@ -52,17 +63,21 @@ export const addToCart = async (req, res) => {
 
         if (existingItem) {
             const newQuantity = existingItem.quantity + quantity;
-            if (newQuantity > product.stock) {
+            // Stock check: compare actual KG weight, not raw packet count
+            const totalWeightKg = resolvedWeightInKg ? resolvedWeightInKg * newQuantity : newQuantity;
+            if (totalWeightKg > product.stock) {
                 return res.status(400).json({
-                    message: `Only ${product.stock}kg available in stock`
+                    message: `Only ${product.stock}kg available in stock for "${product.name}"`
                 });
             }
             existingItem.quantity = newQuantity;
             existingItem.price = resolvedPrice;
         } else {
-            if (quantity > product.stock) {
+            // Stock check: compare actual KG weight, not raw packet count
+            const totalWeightKg = resolvedWeightInKg ? resolvedWeightInKg * quantity : quantity;
+            if (totalWeightKg > product.stock) {
                 return res.status(400).json({
-                    message: `Only ${product.stock}kg available in stock`
+                    message: `Only ${product.stock}kg available in stock for "${product.name}"`
                 });
             }
             cart.items.push({
