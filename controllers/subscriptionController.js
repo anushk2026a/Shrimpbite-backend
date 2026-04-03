@@ -227,13 +227,52 @@ export const updateAllVacationDate = async (req, res) => {
     try {
         const { date, dates, action = "add" } = req.body;
         
-        let targetDates = [];
+        // 1. IST Reference for 8 PM Cutoff
+        const nowUTC = new Date();
+        const istOffsetMs = 5.5 * 60 * 60 * 1000;
+        const nowIST = new Date(nowUTC.getTime() + istOffsetMs);
+        const cutoffHour = 20; // 8:00 PM IST
+        const isPastCutoff = nowIST.getHours() >= cutoffHour;
+
+        // Next Available Window (Today/Tomorrow/Day After)
+        let earliestAllowed = new Date(nowIST);
+        earliestAllowed.setHours(0, 0, 0, 0); // Clean base
+        if (isPastCutoff) {
+            // After 8 PM, everything today and tomorrow is LOCKED. 
+            // Earliest skip allowed is Day After Tomorrow.
+            earliestAllowed.setDate(earliestAllowed.getDate() + 2);
+        } else {
+            // Before 8 PM, Today is locked (delivered), but Tomorrow is still open for skipping.
+            earliestAllowed.setDate(earliestAllowed.getDate() + 1);
+        }
+
+        // 2. Parse and Normalize Dates (Clean all timestamps to Midnight)
+        let incomingDates = [];
         if (dates && Array.isArray(dates)) {
-            targetDates = dates.map(d => new Date(d));
+            incomingDates = dates.map(d => {
+                const clean = new Date(d);
+                clean.setHours(0, 0, 0, 0);
+                return clean;
+            });
         } else if (date) {
-            targetDates = [new Date(date)];
+            const clean = new Date(date);
+            clean.setHours(0, 0, 0, 0);
+            incomingDates = [clean];
         } else {
             return res.status(400).json({ success: false, message: "Date or dates array is required" });
+        }
+
+        // 3. Apply Filter (Only when ADDING dates, always allow removing/resuming)
+        let targetDates = incomingDates;
+        if (action === "add") {
+            targetDates = incomingDates.filter(d => d >= earliestAllowed);
+            
+            if (targetDates.length === 0) {
+                const deadlineMsg = isPastCutoff 
+                    ? "Too late! Preparations for tomorrow are finished (8 PM cutoff). Earliest skip is day-after-tomorrow."
+                    : "You cannot skip dates that have already passed or are currently being delivered.";
+                return res.status(400).json({ success: false, message: deadlineMsg });
+            }
         }
 
         let updateQuery = {};
