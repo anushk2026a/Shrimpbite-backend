@@ -225,18 +225,22 @@ export const updateAllSubscriptionStatus = async (req, res) => {
 
 export const updateAllVacationDate = async (req, res) => {
     try {
-        const { date, action = "add" } = req.body;
-        if (!date) {
-            return res.status(400).json({ success: false, message: "Date is required" });
+        const { date, dates, action = "add" } = req.body;
+        
+        let targetDates = [];
+        if (dates && Array.isArray(dates)) {
+            targetDates = dates.map(d => new Date(d));
+        } else if (date) {
+            targetDates = [new Date(date)];
+        } else {
+            return res.status(400).json({ success: false, message: "Date or dates array is required" });
         }
 
-        const dateObj = new Date(date);
-        
         let updateQuery = {};
         if (action === "remove") {
-            updateQuery = { $pull: { vacationDates: dateObj } };
+            updateQuery = { $pull: { vacationDates: { $in: targetDates } } };
         } else {
-            updateQuery = { $addToSet: { vacationDates: dateObj } };
+            updateQuery = { $addToSet: { vacationDates: { $each: targetDates } } };
         }
 
         const subscriptions = await Subscription.find({
@@ -256,13 +260,13 @@ export const updateAllVacationDate = async (req, res) => {
         if (result.modifiedCount > 0 && retailers.length > 0) {
             const { emitOrderUpdate } = await import("../services/socketService.js");
             retailers.forEach(retailerId => {
-                emitOrderUpdate("SUB-VACATION-ALL", "Vacation Date Changed", { userId: req.userId, date }, retailerId, req.userId);
+                emitOrderUpdate("SUB-VACATION-ALL", "Vacation Date Changed", { userId: req.userId, date: date || JSON.stringify(dates) }, retailerId, req.userId);
             });
         }
 
         res.status(200).json({
             success: true,
-            message: `Successfully ${action === "remove" ? 'resumed' : 'skipped'} deliveries for ${date} on active subscriptions`,
+            message: `Successfully ${action === "remove" ? 'resumed' : 'skipped'} deliveries on active subscriptions`,
             updatedCount: result.modifiedCount
         });
     } catch (error) {
