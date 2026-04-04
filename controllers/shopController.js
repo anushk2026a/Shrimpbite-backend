@@ -32,23 +32,30 @@ export const getPublicShops = async (req, res) => {
             .select("name email businessDetails isShopActive createdAt")
             .sort({ createdAt: -1 });
 
-        const minimalShops = await Promise.all(shops.map(async (shop) => {
-            const rating = await calculateShopRating(shop._id);
-            return {
-                id: shop._id,
-                name: shop.businessDetails?.storeDisplayName || shop.businessDetails?.businessName || shop.name,
-                businessName: shop.businessDetails?.businessName,
-                image: shop.businessDetails?.storeImage || "",
-                location: shop.businessDetails?.location?.city || "",
-                isShopActive: shop.isShopActive ?? false,
-                rating: rating,
-                deliveryTime: "30-45 mins"
-            };
-        }));
+        const validShops = [];
+
+        // Loop through and only include shops with Published products
+        for (const shop of shops) {
+            const hasProducts = await Product.countDocuments({ retailer: shop._id, status: "Published" }) > 0;
+            
+            if (hasProducts) {
+                const rating = await calculateShopRating(shop._id);
+                validShops.push({
+                    id: shop._id,
+                    name: shop.businessDetails?.storeDisplayName || shop.businessDetails?.businessName || shop.name,
+                    businessName: shop.businessDetails?.businessName,
+                    image: shop.businessDetails?.storeImage || "",
+                    location: shop.businessDetails?.location?.city || "",
+                    isShopActive: shop.isShopActive ?? false,
+                    rating: rating,
+                    deliveryTime: "30-45 mins"
+                });
+            }
+        }
 
         res.status(200).json({
             success: true,
-            data: minimalShops
+            data: validShops
         });
     } catch (error) {
         res.status(500).json({ success: false, message: error.message });

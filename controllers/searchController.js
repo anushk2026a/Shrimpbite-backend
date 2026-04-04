@@ -32,19 +32,29 @@ export const globalSearch = async (req, res) => {
                 { "businessDetails.storeDisplayName": searchRegex }
             ]
         })
-        .select("name email businessDetails isShopActive")
-        .limit(10);
+        .select("name email businessDetails isShopActive");
 
-        const formattedShops = shops.map(shop => ({
-            id: shop._id,
-            name: shop.businessDetails?.storeDisplayName || shop.businessDetails?.businessName || shop.name,
-            businessName: shop.businessDetails?.businessName,
-            image: shop.businessDetails?.storeImage || "",
-            location: shop.businessDetails?.location?.city || "",
-            isShopActive: shop.isShopActive ?? false,
-            rating: 4.5,
-            deliveryTime: "30-45 mins"
-        }));
+        const formattedShops = [];
+        
+        // Loop through and limit to 10 valid shops containing published products
+        for (const shop of shops) {
+            if (formattedShops.length >= 10) break;
+            
+            const hasProducts = await Product.countDocuments({ retailer: shop._id, status: "Published" }) > 0;
+            
+            if (hasProducts) {
+                formattedShops.push({
+                    id: shop._id,
+                    name: shop.businessDetails?.storeDisplayName || shop.businessDetails?.businessName || shop.name,
+                    businessName: shop.businessDetails?.businessName,
+                    image: shop.businessDetails?.storeImage || "",
+                    location: shop.businessDetails?.location?.city || "",
+                    isShopActive: shop.isShopActive ?? false,
+                    rating: 4.5,
+                    deliveryTime: "30-45 mins"
+                });
+            }
+        }
 
         // 2. Search for Products
         // Only published products
