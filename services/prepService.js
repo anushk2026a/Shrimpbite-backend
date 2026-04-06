@@ -145,6 +145,10 @@ export const getDailyPrepList = async (retailerId, dateString) => {
 
         order.items.forEach(item => {
             if (item.retailer && item.retailer.toString() === retailerId.toString()) {
+                const variant = item.product.variants?.find(v => v._id?.toString() === item.variantId?.toString());
+                const weightToSum = variant ? variant.weightInKg : 1.0;
+                const totalItemWeight = weightToSum * item.quantity;
+
                 detailedItems.push({
                     id: order._id + "_" + item.product._id,
                     orderId: order.orderId,
@@ -152,6 +156,7 @@ export const getDailyPrepList = async (retailerId, dateString) => {
                     productId: item.product._id,
                     productName: item.product.name,
                     quantity: item.quantity,
+                    totalWeight: totalItemWeight,
                     weightLabel: item.weightLabel || "",
                     unit: "kg",
                     status: item.status,
@@ -230,6 +235,10 @@ export const getDailyPrepList = async (retailerId, dateString) => {
                 };
             }
 
+            const variant = sub.product.variants?.find(v => v._id?.toString() === sub.variantId?.toString());
+            const weightToSum = variant ? variant.weightInKg : 1.0;
+            const totalItemWeight = weightToSum * sub.quantity;
+
             detailedItems.push({
                 id: "PRE-" + sub._id,
                 orderId: "WAITING-BILLING",
@@ -237,6 +246,7 @@ export const getDailyPrepList = async (retailerId, dateString) => {
                 productId: sub.product._id,
                 productName: sub.product.name,
                 quantity: sub.quantity,
+                totalWeight: totalItemWeight,
                 weightLabel: sub.weightLabel || "",
                 unit: "kg",
                 status: displayStatus,
