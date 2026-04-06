@@ -121,8 +121,9 @@ export const getDailyPrepList = async (retailerId, dateString) => {
                 displayStatus = `Paused for ${dd}/${mm}`;
             }
 
-            // Only add to summary totals if it actually needs to be prepared
-            if (displayStatus === "Pending") {
+            // Only add to summary totals if it actually needs to be prepared 
+            // and it's a future prediction. For today, we only count real orders in summary.
+            if (displayStatus === "Pending" && isFuture) {
                 addItemToRequirements({
                     product: sub.product,
                     quantity: sub.quantity,
