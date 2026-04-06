@@ -28,6 +28,7 @@ const app = express()
 // Middleware
 const allowedOrigins = [
     "http://localhost:3000",
+    "https://retailer.shrimpbite.in",
     "http://127.0.0.1:3000",
     "https://shrimpbite-admin.vercel.app",
     "https://shrimpbite-retailer.vercel.app",
@@ -39,13 +40,13 @@ app.use(cors({
     credentials: true,
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allowedHeaders: [
-        "Content-Type", 
-        "Authorization", 
-        "x-cron-secret", 
-        "x-requested-with", 
-        "Accept", 
-        "Origin", 
-        "Access-Control-Request-Method", 
+        "Content-Type",
+        "Authorization",
+        "x-cron-secret",
+        "x-requested-with",
+        "Accept",
+        "Origin",
+        "Access-Control-Request-Method",
         "Access-Control-Request-Headers"
     ],
     optionsSuccessStatus: 200
