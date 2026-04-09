@@ -52,7 +52,11 @@ app.use(cors({
     optionsSuccessStatus: 200
 }));
 
-app.use(express.json())
+app.use(express.json({
+    verify: (req, res, buf) => {
+        req.rawBody = buf;
+    }
+}));
 // DB is connected once at startup in server.js
 
 app.use("/uploads", express.static(path.join(process.cwd(), "uploads")))

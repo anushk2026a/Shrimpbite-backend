@@ -40,7 +40,7 @@ const orderSchema = new mongoose.Schema({
         },
         status: {
             type: String,
-            enum: ["Pending", "Accepted", "Processing", "Preparing", "Shipped", "Out for Delivery", "Delivered", "Completed", "Cancelled", "Rider Assigned", "Rider Accepted"],
+            enum: ["Payment Pending", "Pending", "Accepted", "Processing", "Preparing", "Shipped", "Out for Delivery", "Delivered", "Completed", "Cancelled", "Rider Assigned", "Rider Accepted"],
             default: "Pending"
         }
     }],
@@ -50,7 +50,7 @@ const orderSchema = new mongoose.Schema({
     },
     status: {
         type: String,
-        enum: ["Pending", "Accepted", "Processing", "Preparing", "Shipped", "Out for Delivery", "Delivered", "Completed", "Cancelled", "Rider Assigned", "Rider Accepted"],
+        enum: ["Payment Pending", "Pending", "Accepted", "Processing", "Preparing", "Shipped", "Out for Delivery", "Delivered", "Completed", "Cancelled", "Rider Assigned", "Rider Accepted"],
         default: "Pending"
     },
     deliveryAddress: {
@@ -92,6 +92,9 @@ const orderSchema = new mongoose.Schema({
         default: "None"
     },
     deliveredAt: Date,
+    razorpayOrderId: String,
+    razorpayPaymentId: String,
+    razorpaySignature: String,
     statusHistory: [{
         status: { type: String, required: true },
         changedBy: { type: mongoose.Schema.Types.ObjectId },

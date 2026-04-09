@@ -34,3 +34,12 @@ export const verifyRazorpaySignature = (orderId, paymentId, signature) => {
 
     return generated_signature === signature;
 };
+
+export const verifyRazorpayWebhook = (rawBody, signature, secret) => {
+    const expected_signature = crypto
+        .createHmac("sha256", secret)
+        .update(rawBody)
+        .digest("hex");
+
+    return expected_signature === signature;
+};

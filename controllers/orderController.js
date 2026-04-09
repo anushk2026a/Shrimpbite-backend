@@ -6,19 +6,43 @@ import Subscription from "../models/Subscription.js";
 import * as walletService from "../services/walletService.js";
 import { emitOrderUpdate } from "../services/socketService.js";
 import { createNotification } from "../services/notificationService.js";
+import { createRazorpayOrder, verifyRazorpaySignature } from "../services/razorpayService.js";
+import { finalizeOrder } from "../services/orderService.js";
 
 export const placeOrder = async (req, res) => {
     try {
         const userId = req.userId;
-        let { deliveryAddress, paymentMethod, orderType } = req.body;
+        let { deliveryAddress, paymentMethod, orderType, items: bodyItems } = req.body;
 
-        // 1. Fetch Cart
+        // 1. Fetch Cart or use Body Items
+        let itemsToProcess = [];
+        let retailerFromCart = null;
+
         const cart = await Cart.findOne({ user: userId }).populate("items.product");
-        if (!cart || cart.items.length === 0) {
-            return res.status(400).json({ success: false, message: "Cart is empty" });
+        if (cart && cart.items.length > 0) {
+            itemsToProcess = cart.items;
+            retailerFromCart = cart.retailer;
+        } else if (bodyItems && bodyItems.length > 0) {
+            // Populate product info for body items
+            for (const item of bodyItems) {
+                const product = await Product.findById(item.productId);
+                if (!product) {
+                    return res.status(404).json({ success: false, message: `Product not found: ${item.productId}` });
+                }
+                itemsToProcess.push({
+                    product,
+                    quantity: item.quantity,
+                    variantId: item.variantId,
+                    weightLabel: item.weightLabel
+                });
+            }
         }
 
-        // 1.1 Address handling (for Spot Orders where address might not be sent)
+        if (itemsToProcess.length === 0) {
+            return res.status(400).json({ success: false, message: "Cart is empty and no items provided" });
+        }
+
+        // 1.1 Address handling
         if (!deliveryAddress || Object.keys(deliveryAddress).length === 0) {
             const user = await AppUser.findById(userId);
             const defaultAddress = user?.addresses?.find(a => a.isDefault);
@@ -35,30 +59,26 @@ export const placeOrder = async (req, res) => {
         // 2. Validate Stock and Calculate Total
         let totalAmount = 0;
         const orderItems = [];
-        let identifiedRetailer = cart.retailer; // Initial identifier
+        let identifiedRetailer = retailerFromCart;
 
-        for (const item of cart.items) {
-            let weightToReduce = item.quantity; // Default as 1kg per unit (for flat-price products only)
+        for (const item of itemsToProcess) {
+            let weightToReduce = item.quantity;
             let currentPrice = item.product.price;
 
-            // VARIANT LOGIC: If product has variants, variantId is MANDATORY
             if (item.product.variants && item.product.variants.length > 0) {
                 if (!item.variantId) {
-                    // Safety guard: reject order if no variant was selected for a variant-product
-                    // This prevents wrong stock deduction (e.g. deducting 1kg instead of 0.5kg)
                     return res.status(400).json({
                         success: false,
-                        message: `Weight option not selected for "${item.product.name}". Please re-add it to your cart with a valid weight.`
+                        message: `Weight option not selected for "${item.product.name}".`
                     });
                 }
                 const variant = item.product.variants.id(item.variantId);
                 if (!variant) {
                     return res.status(400).json({
                         success: false,
-                        message: `Selected weight option for "${item.product.name}" is no longer available. Please update your cart.`
+                        message: `Selected weight option for "${item.product.name}" is no longer available.`
                     });
                 }
-                // Correct deduction: e.g. 500g order → 0.5kg deducted from master stock
                 weightToReduce = variant.weightInKg * item.quantity;
                 currentPrice = variant.price;
             }
@@ -70,30 +90,28 @@ export const placeOrder = async (req, res) => {
                 });
             }
 
-            // Fallback: If cart.retailer is missing, use the retailer from the product itself
             const itemRetailer = item.product.retailer || identifiedRetailer;
             if (!identifiedRetailer) identifiedRetailer = itemRetailer;
 
             totalAmount += currentPrice * item.quantity;
             orderItems.push({
                 product: item.product._id,
-                variantId: item.variantId, // Track which weight was picked
+                variantId: item.variantId,
                 weightLabel: item.weightLabel,
                 retailer: itemRetailer,
                 quantity: item.quantity,
                 price: currentPrice,
-                status: "Pending"
+                status: paymentMethod === "Razorpay" ? "Payment Pending" : "Pending"
             });
 
-            // Store weightToReduce for the final loop
             item.calculatedWeightToReduce = weightToReduce;
         }
 
         if (!identifiedRetailer) {
-            return res.status(400).json({ success: false, message: "Retailer not identified for items in cart" });
+            return res.status(400).json({ success: false, message: "Retailer not identified for items" });
         }
 
-        // 2.1 Wallet Balance Check
+        // 2.1 Wallet Balance Check (Only if not Razorpay)
         if (paymentMethod === "Wallet") {
             const user = await AppUser.findById(userId);
             if (!user || user.walletBalance < totalAmount) {
@@ -102,15 +120,20 @@ export const placeOrder = async (req, res) => {
                     message: `Insufficient wallet balance. Total: ₹${totalAmount}, Current: ₹${user?.walletBalance || 0}.`
                 });
             }
-
-            // Deduct from wallet
             await walletService.adjustBalance(userId, "appUser", totalAmount, "Debit", "Order Payment", "Order", null);
         }
 
-        // 3. Generate Order ID
+        // 3. Razorpay Order Creation
+        let razorpayOrderId = null;
+        if (paymentMethod === "Razorpay") {
+            const rzpOrder = await createRazorpayOrder(totalAmount);
+            razorpayOrderId = rzpOrder.id;
+        }
+
+        // 4. Generate Order ID
         const orderId = `ORD-${Date.now()}-${Math.floor(1000 + Math.random() * 9000)}`;
 
-        // 4. Create Order
+        // 5. Create Order
         const order = await Order.create({
             orderId,
             user: userId,
@@ -119,50 +142,60 @@ export const placeOrder = async (req, res) => {
             deliveryAddress,
             paymentMethod,
             paymentStatus: paymentMethod === "Wallet" ? "Paid" : "Pending",
-            orderType: orderType || "One-time"
+            status: paymentMethod === "Razorpay" ? "Payment Pending" : "Pending",
+            orderType: orderType || "One-time",
+            razorpayOrderId
         });
 
-        // 5. Update Stock & Check for Low Inventory
-        for (const item of cart.items) {
-            const weightToReduce = item.calculatedWeightToReduce || item.quantity;
-            const updatedProduct = await Product.findByIdAndUpdate(
-                item.product._id,
-                { $inc: { stock: -weightToReduce } },
-                { new: true }
-            );
+        // 6. Final Steps for Wallet Orders (Stock deduction, notifications, etc.)
+        // For Razorpay, these will happen in verify-payment
+        if (paymentMethod === "Wallet") {
+            for (const item of itemsToProcess) {
+                const weightToReduce = item.calculatedWeightToReduce || item.quantity;
+                const updatedProduct = await Product.findByIdAndUpdate(
+                    item.product._id,
+                    { $inc: { stock: -weightToReduce } },
+                    { new: true }
+                );
 
-            if (updatedProduct.stock <= 5) {
-                createNotification(identifiedRetailer.toString(), {
-                    title: "Low Inventory Alert! ⚠️",
-                    message: `Product "${updatedProduct.name}" is running low on stock (${updatedProduct.stock}kg left).`,
-                    type: "Inventory",
-                    referenceId: updatedProduct._id.toString()
+                if (updatedProduct.stock <= 5) {
+                    createNotification(identifiedRetailer.toString(), {
+                        title: "Low Inventory Alert! ⚠️",
+                        message: `Product "${updatedProduct.name}" is running low on stock (${updatedProduct.stock}kg left).`,
+                        type: "Inventory",
+                        referenceId: updatedProduct._id.toString()
+                    });
+                }
+            }
+
+            // Clear Cart
+            await Cart.findOneAndDelete({ user: userId });
+
+            // Socket & Push Notifications for each retailer
+            const populatedOrder = await Order.findById(order._id).populate("items.product", "name");
+            const retailerIds = [...new Set(orderItems.map(item => item.retailer.toString()))];
+
+            for (const retailerId of retailerIds) {
+                await emitOrderUpdate(order.orderId, "Pending", populatedOrder, retailerId, userId);
+                createNotification(retailerId, {
+                    title: "New Order Received! 🦐",
+                    message: `You have a new order (#${order._id.toString().slice(-6)}) for ₹${totalAmount}.`,
+                    type: "Order",
+                    referenceId: order._id.toString()
                 });
             }
         }
 
-        // 6. Clear Cart
-        await Cart.findOneAndDelete({ user: userId });
-
-        // 7. Socket Notification — populate first so product names are available in real-time
-        const populatedOrder = await Order.findById(order._id).populate("items.product", "name");
-        await emitOrderUpdate(order.orderId, "Pending", populatedOrder, identifiedRetailer, userId);
-
-        // Create Notification for Retailer
-        createNotification(identifiedRetailer.toString(), {
-            title: "New Order Received! 🦐",
-            message: `You have a new order (#${order._id.toString().slice(-6)}) for ₹${totalAmount}.`,
-            type: "Order",
-            referenceId: order._id.toString()
-        });
-
         res.status(201).json({
             success: true,
-            message: "Order placed successfully",
-            order
+            message: paymentMethod === "Razorpay" ? "Payment initiated" : "Order placed successfully",
+            orderId: order.orderId,
+            razorpayOrderId,
+            order: paymentMethod === "Wallet" ? order : undefined // Optionally hide full order for payment pending
         });
 
     } catch (error) {
+        console.error("Place Order Error:", error);
         res.status(500).json({ success: false, message: error.message });
     }
 };
@@ -243,6 +276,32 @@ export const getOrderTracking = async (req, res) => {
             order
         });
     } catch (error) {
+        res.status(500).json({ success: false, message: error.message });
+    }
+};
+
+export const verifyPayment = async (req, res) => {
+    try {
+        const { orderId, razorpayPaymentId, razorpayOrderId, razorpaySignature } = req.body;
+
+        // 1. Verify Signature
+        const isValid = verifyRazorpaySignature(razorpayOrderId, razorpayPaymentId, razorpaySignature);
+
+        if (!isValid) {
+            return res.status(400).json({ success: false, message: "Invalid payment signature" });
+        }
+
+        // 2. Finalize Order
+        const order = await finalizeOrder(orderId, razorpayPaymentId, razorpaySignature);
+
+        res.status(200).json({
+            success: true,
+            message: "Payment verified and order processed",
+            order
+        });
+
+    } catch (error) {
+        console.error("Verify Payment Error:", error);
         res.status(500).json({ success: false, message: error.message });
     }
 };
