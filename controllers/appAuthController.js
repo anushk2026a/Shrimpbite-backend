@@ -242,6 +242,15 @@ export const updateProfile = async (req, res) => {
 
         if (hasChanges) {
             await user.save();
+
+            // If email was one of the changes, send the Welcome Email
+            if (updates.includes("email") && user.email) {
+                try {
+                    await sendWelcomeEmail(user.email, user.fullName);
+                } catch (error) {
+                    console.log("Welcome email failed during profile update:", error.message);
+                }
+            }
         }
 
         return res.status(200).json({ 
