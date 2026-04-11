@@ -207,42 +207,49 @@ export const updateProfile = async (req, res) => {
         if (!user) return res.status(404).json({ success: false, message: "User not found" });
 
         const updates = [];
+        let hasChanges = false;
 
         // fullName
-        if (fullName) {
-            if (fullName === user.fullName) {
-                return res.status(400).json({ success: false, message: "Full name is same as previous" });
-            }
-            user.fullName = fullName;
+        if (fullName && fullName.trim() !== user.fullName) {
+            user.fullName = fullName.trim();
             updates.push("fullName");
+            hasChanges = true;
         }
 
         // email
         if (email) {
             const normalizedEmail = email.toLowerCase().trim();
-            if (normalizedEmail !== user.email) {
+            if (normalizedEmail !== (user.email || "")) {
                 const emailExists = await AppUser.findOne({ email: normalizedEmail });
                 if (emailExists) return res.status(400).json({ success: false, message: "This email is already registered with another account" });
                 user.email = normalizedEmail;
                 updates.push("email");
+                hasChanges = true;
             }
         }
 
         // phone
         if (phoneNumber) {
             const normalizedPhone = normalizePhoneNumber(phoneNumber);
-            if (normalizedPhone === user.phoneNumber) {
-                return res.status(400).json({ success: false, message: "Phone number is same as previous" });
+            if (normalizedPhone !== user.phoneNumber) {
+                const phoneExists = await AppUser.findOne({ phoneNumber: normalizedPhone });
+                if (phoneExists) return res.status(400).json({ success: false, message: "Phone number already in use" });
+                user.phoneNumber = normalizedPhone;
+                updates.push("phoneNumber");
+                hasChanges = true;
             }
-            const phoneExists = await AppUser.findOne({ phoneNumber: normalizedPhone });
-            if (phoneExists) return res.status(400).json({ success: false, message: "Phone number already in use" });
-            user.phoneNumber = normalizedPhone;
-            updates.push("phoneNumber");
         }
 
-        await user.save();
+        if (hasChanges) {
+            await user.save();
+        }
 
-        return res.status(200).json({ success: true, message: "Profile updated successfully", updatedFields: updates, data: user });
+        return res.status(200).json({ 
+            success: true, 
+            message: hasChanges ? "Profile updated successfully" : "No changes detected", 
+            updatedFields: updates, 
+            data: user 
+        });
     } catch (error) {
         console.error("updateProfile error:", error);
         return res.status(500).json({ success: false, message: "Something went wrong while updating profile" });
