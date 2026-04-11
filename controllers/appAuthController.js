@@ -219,13 +219,13 @@ export const updateProfile = async (req, res) => {
 
         // email
         if (email) {
-            if (email === user.email) {
-                return res.status(400).json({ success: false, message: "Email is same as previous" });
+            const normalizedEmail = email.toLowerCase().trim();
+            if (normalizedEmail !== user.email) {
+                const emailExists = await AppUser.findOne({ email: normalizedEmail });
+                if (emailExists) return res.status(400).json({ success: false, message: "This email is already registered with another account" });
+                user.email = normalizedEmail;
+                updates.push("email");
             }
-            const emailExists = await AppUser.findOne({ email });
-            if (emailExists) return res.status(400).json({ success: false, message: "Email already in use" });
-            user.email = email;
-            updates.push("email");
         }
 
         // phone
