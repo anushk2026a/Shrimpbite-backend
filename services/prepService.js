@@ -55,7 +55,7 @@ export const getDailyPrepList = async (retailerId, dateString) => {
     const orders = await Order.find({
         "items.retailer": retailerId,
         createdAt: { $gte: targetDate, $lt: nextDay },
-        status: { $nin: ["Cancelled"] }
+        status: { $nin: ["Cancelled", "Payment Pending"] }
     }).populate("items.product");
 
     const existingSubIds = new Set(orders.filter(o => o.orderType === "Subscription").map(o => o.subscriptionId?.toString()));

@@ -461,7 +461,10 @@ export const getRetailerOrders = async (req, res) => {
         const { customerId } = req.query;
 
         // Build query
-        const query = { "items.retailer": retailerId };
+        const query = { 
+            "items.retailer": retailerId,
+            status: { $ne: "Payment Pending" }
+        };
         if (customerId) {
             query.user = customerId;
         }
