@@ -242,13 +242,6 @@ export const updateProfile = async (req, res) => {
 
         await user.save();
 
-        // send welcome email (non-blocking)
-        try {
-            await sendWelcomeEmail(user.email, user.fullName);
-        } catch (error) {
-            console.log("Welcome email failed:", error.message);
-        }
-
         return res.status(200).json({ success: true, message: "Profile updated successfully", updatedFields: updates, data: user });
     } catch (error) {
         console.error("updateProfile error:", error);
@@ -288,6 +281,56 @@ export const updateName = async (req, res) => {
     } catch (error) {
         console.error("updateName error:", error);
         return res.status(500).json({ success: false, message: "Something went wrong while updating name" });
+    }
+};
+
+// Update Email (Used by Flutter App)
+export const updateEmail = async (req, res) => {
+    try {
+        let { email } = req.body;
+
+        if (!email) {
+            return res.status(400).json({ success: false, message: "Email is required" });
+        }
+
+        email = email.toLowerCase().trim();
+
+        const user = await AppUser.findById(req.user._id);
+        if (!user) return res.status(404).json({ success: false, message: "User not found" });
+
+        if (email === user.email) {
+            return res.status(400).json({ success: false, message: "New email cannot be the same as the current email" });
+        }
+
+        // Check if email is already taken by another account
+        const emailExists = await AppUser.findOne({ email });
+        if (emailExists) {
+            return res.status(400).json({ success: false, message: "This email is already registered with another account" });
+        }
+
+        user.email = email;
+        await user.save();
+
+        // Send Welcome Email (The perfect time to send it since they just provided it!)
+        try {
+            await sendWelcomeEmail(user.email, user.fullName);
+        } catch (error) {
+            console.log("Welcome email failed during email update:", error.message);
+        }
+
+        return res.status(200).json({
+            success: true,
+            message: "Email updated successfully",
+            data: {
+                id: user._id,
+                fullName: user.fullName,
+                email: user.email,
+                phoneNumber: user.phoneNumber
+            }
+        });
+    } catch (error) {
+        console.error("updateEmail error:", error);
+        return res.status(500).json({ success: false, message: "Something went wrong while updating email" });
     }
 };
 
