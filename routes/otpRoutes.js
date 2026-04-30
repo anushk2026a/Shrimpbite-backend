@@ -129,29 +129,48 @@ router.post("/verify", async (req, res) => {
 // Verify Firebase ID Token (Phone Auth)
 router.post("/verify-firebase", async (req, res) => {
     try {
-        const { idToken, phoneNumber } = req.body;
+        const { idToken, phoneNumber, otp } = req.body;
 
-        if (!idToken) {
-            return res.status(400).json({ success: false, message: "ID Token is required" });
+        // --- APPLE REVIEW BYPASS ---
+        // If the user enters the specific test numbers and OTP, bypass Firebase completely.
+        const customerTestPhone = "1234512345";
+        const riderTestPhone = "1002003004";
+        const testOtp = "123456";
+
+        const isBypassCustomer = phoneNumber && normalizePhoneNumber(phoneNumber) === normalizePhoneNumber(customerTestPhone) && otp === testOtp;
+        const isBypassRider = phoneNumber && normalizePhoneNumber(phoneNumber) === normalizePhoneNumber(riderTestPhone) && otp === testOtp;
+
+        if (isBypassCustomer || isBypassRider) {
+            console.log("🍏 Apple Review bypass activated for:", phoneNumber);
+            // Skip Firebase verification, proceed directly to role check below
+        } else {
+            // Normal Firebase Flow
+            if (!idToken) {
+                return res.status(400).json({ success: false, message: "ID Token is required" });
+            }
+
+            const admin = (await import("../config/firebase.js")).default;
+            
+            // Verify Firebase Token
+            let decodedToken;
+            try {
+                decodedToken = await admin.auth().verifyIdToken(idToken);
+            } catch (error) {
+                console.error("Firebase token verification failed:", error.message);
+                return res.status(401).json({ success: false, message: "Invalid or expired Firebase token" });
+            }
+
+            const verifiedPhone = decodedToken.phone_number;
+            if (!verifiedPhone && !phoneNumber) {
+                return res.status(400).json({ success: false, message: "Phone number not found in Firebase token or request" });
+            }
+
+            // Ensure the phoneNumber matches the verified phone (or use the verified one)
+            // But since we are inside the else block, we just set a variable to be used below
+            req.verifiedPhoneToUse = verifiedPhone || phoneNumber;
         }
 
-        const admin = (await import("../config/firebase.js")).default;
-        
-        // Verify Firebase Token
-        let decodedToken;
-        try {
-            decodedToken = await admin.auth().verifyIdToken(idToken);
-        } catch (error) {
-            console.error("Firebase token verification failed:", error.message);
-            return res.status(401).json({ success: false, message: "Invalid or expired Firebase token" });
-        }
-
-        const verifiedPhone = decodedToken.phone_number;
-        if (!verifiedPhone && !phoneNumber) {
-            return res.status(400).json({ success: false, message: "Phone number not found in Firebase token or request" });
-        }
-
-        const searchPhone = normalizePhoneNumber(verifiedPhone || phoneNumber);
+        const searchPhone = normalizePhoneNumber(req.verifiedPhoneToUse || phoneNumber);
 
         // --- TIERED ROLE CHECK ---
         let user = null;
