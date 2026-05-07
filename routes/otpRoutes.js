@@ -59,18 +59,30 @@ router.post("/verify", async (req, res) => {
 
         phoneNumber = normalizePhoneNumber(phoneNumber);
 
-        const otpRecord = await Otp.findOne({ phoneNumber });
+        // --- APPLE REVIEW BYPASS ---
+        const customerTestPhone = "1234512345";
+        const riderTestPhone = "1002003004";
+        const testOtp = "123456";
 
-        if (!otpRecord) {
-            return res.status(400).json({ success: false, message: "No OTP found for this number" });
-        }
+        const isBypassCustomer = phoneNumber === normalizePhoneNumber(customerTestPhone) && otp === testOtp;
+        const isBypassRider = phoneNumber === normalizePhoneNumber(riderTestPhone) && otp === testOtp;
 
-        if (otpRecord.otp !== otp) {
-            return res.status(400).json({ success: false, message: "Invalid OTP" });
-        }
+        if (isBypassCustomer || isBypassRider) {
+            console.log("🍏 Apple Review bypass activated for:", phoneNumber);
+        } else {
+            const otpRecord = await Otp.findOne({ phoneNumber });
 
-        if (otpRecord.expiresAt < new Date()) {
-            return res.status(400).json({ success: false, message: "OTP expired" });
+            if (!otpRecord) {
+                return res.status(400).json({ success: false, message: "No OTP found for this number" });
+            }
+
+            if (otpRecord.otp !== otp) {
+                return res.status(400).json({ success: false, message: "Invalid OTP" });
+            }
+
+            if (otpRecord.expiresAt < new Date()) {
+                return res.status(400).json({ success: false, message: "OTP expired" });
+            }
         }
 
         // --- TIERED ROLE CHECK ---
