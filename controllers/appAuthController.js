@@ -4,6 +4,7 @@ import otpGenerator from "otp-generator";
 import AppUser from "../models/AppUser.js";
 import User from "../models/User.js";
 import Otp from "../models/Otp.js";
+import AccountDeletionRequest from "../models/AccountDeletionRequest.js";
 import { sendWelcomeEmail } from "../services/emailService.js";
 import admin from "firebase-admin";
 import { normalizePhoneNumber } from "../utils/phoneUtils.js";
@@ -563,6 +564,41 @@ export const googleAuth = async (req, res) => {
 
     } catch (error) {
         console.error("googleAuth error:", error);
+        return res.status(500).json({ success: false, message: "Server error", error: error.message });
+    }
+};
+
+// Account Deletion Request
+export const deleteAccountRequest = async (req, res) => {
+    try {
+        const { name, email, region } = req.body;
+        const userId = req.user._id || req.user.id;
+
+        if (!name || !email || !region) {
+            return res.status(400).json({ success: false, message: "Name, email, and region are required" });
+        }
+
+        // Check if request already exists
+        const existingRequest = await AccountDeletionRequest.findOne({ user: userId, status: "pending" });
+        if (existingRequest) {
+            return res.status(400).json({ success: false, message: "You already have a pending account deletion request" });
+        }
+
+        const deletionRequest = await AccountDeletionRequest.create({
+            user: userId,
+            name,
+            email,
+            region,
+            status: "pending"
+        });
+
+        return res.status(201).json({
+            success: true,
+            message: "Account deletion request submitted successfully. Our admin will review it.",
+            data: deletionRequest
+        });
+    } catch (error) {
+        console.error("deleteAccountRequest error:", error);
         return res.status(500).json({ success: false, message: "Server error", error: error.message });
     }
 };

@@ -17,7 +17,8 @@ import {
     forgotPassword,
     addAddress,
     getAddresses,
-    deleteAddress
+    deleteAddress,
+    deleteAccountRequest
 } from "../controllers/appAuthController.js";
 import { getPublicCategories } from "../controllers/adminController.js";
 import { getPublicSubscriptionPlans } from "../controllers/subscriptionController.js";
@@ -95,5 +96,8 @@ router.patch("/notifications/read-all", protectAppUser, markAllAsRead);
 router.delete("/notifications/delete/:id", protectAppUser, deleteNotification);
 router.delete("/notifications/delete-all", protectAppUser, deleteAllNotifications);
 router.post("/update-fcm-token", protectAppUser, updateFcmToken);
+
+// Account Deletion Request
+router.post("/delete-account-request", protectAppUser, deleteAccountRequest);
 
 export default router;

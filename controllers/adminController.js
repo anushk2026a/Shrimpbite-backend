@@ -2,6 +2,7 @@ import User from "../models/User.js";
 import AppUser from "../models/AppUser.js";
 import Category from "../models/Category.js";
 import Order from "../models/Order.js";
+import AccountDeletionRequest from "../models/AccountDeletionRequest.js";
 // --- CATEGORY CONTROLLERS ---
 export const getCategories = async (req, res) => {
     try {
@@ -352,6 +353,66 @@ export const getAllOrders = async (req, res) => {
                 currentPage: parseInt(page),
                 limit: parseInt(limit)
             }
+        });
+    } catch (error) {
+        res.status(500).json({ success: false, message: error.message });
+    }
+};
+
+// --- ACCOUNT DELETION REQUESTS ---
+export const getAccountDeletionRequests = async (req, res) => {
+    try {
+        const { page = 1, limit = 10, status } = req.query;
+        const query = {};
+
+        if (status && status !== "All") {
+            query.status = status;
+        }
+
+        const skip = (parseInt(page) - 1) * parseInt(limit);
+
+        const requests = await AccountDeletionRequest.find(query)
+            .populate("user", "fullName phoneNumber")
+            .sort({ createdAt: -1 })
+            .skip(skip)
+            .limit(parseInt(limit));
+
+        const totalRequests = await AccountDeletionRequest.countDocuments(query);
+
+        res.status(200).json({
+            success: true,
+            data: requests,
+            pagination: {
+                totalRequests,
+                totalPages: Math.ceil(totalRequests / limit),
+                currentPage: parseInt(page),
+                limit: parseInt(limit)
+            }
+        });
+    } catch (error) {
+        res.status(500).json({ success: false, message: error.message });
+    }
+};
+
+export const updateAccountDeletionRequest = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { status, adminNotes } = req.body;
+
+        const request = await AccountDeletionRequest.findById(id);
+        if (!request) {
+            return res.status(404).json({ success: false, message: "Request not found" });
+        }
+
+        if (status) request.status = status;
+        if (adminNotes !== undefined) request.adminNotes = adminNotes;
+
+        await request.save();
+
+        res.status(200).json({
+            success: true,
+            message: "Account deletion request updated successfully",
+            data: request
         });
     } catch (error) {
         res.status(500).json({ success: false, message: error.message });

@@ -8,7 +8,9 @@ import {
     updateCategory,
     deleteCategory,
     getDashboardStats,
-    getAllOrders
+    getAllOrders,
+    getAccountDeletionRequests,
+    updateAccountDeletionRequest
 } from "../controllers/adminController.js";
 import {
     getSubscriptionPlans,
@@ -48,5 +50,9 @@ router.delete("/subscriptions/:id", checkModuleAccess("Dashboard"), deleteSubscr
 
 // Order Management
 router.get("/orders", checkModuleAccess("Order Management"), getAllOrders)
+
+// Account Deletion Requests
+router.get("/account-deletion-requests", checkModuleAccess("App Users"), getAccountDeletionRequests)
+router.put("/account-deletion-requests/:id", checkModuleAccess("App Users"), updateAccountDeletionRequest)
 
 export default router
