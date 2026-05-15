@@ -61,10 +61,11 @@ router.post("/verify", async (req, res) => {
 
         // --- APPLE REVIEW BYPASS ---
         const customerTestPhone = "1234512345";
+        const customerTestPhone2 = "9090898978";
         const riderTestPhone = "1002003004";
         const testOtp = "123456";
 
-        const isBypassCustomer = phoneNumber === normalizePhoneNumber(customerTestPhone) && otp === testOtp;
+        const isBypassCustomer = (phoneNumber === normalizePhoneNumber(customerTestPhone) || phoneNumber === normalizePhoneNumber(customerTestPhone2)) && otp === testOtp;
         const isBypassRider = phoneNumber === normalizePhoneNumber(riderTestPhone) && otp === testOtp;
 
         if (isBypassCustomer || isBypassRider) {
@@ -146,10 +147,11 @@ router.post("/verify-firebase", async (req, res) => {
         // --- APPLE REVIEW BYPASS ---
         // If the user enters the specific test numbers and OTP, bypass Firebase completely.
         const customerTestPhone = "1234512345";
+        const customerTestPhone2 = "9090898978";
         const riderTestPhone = "1002003004";
         const testOtp = "123456";
 
-        const isBypassCustomer = phoneNumber && normalizePhoneNumber(phoneNumber) === normalizePhoneNumber(customerTestPhone) && otp === testOtp;
+        const isBypassCustomer = phoneNumber && (normalizePhoneNumber(phoneNumber) === normalizePhoneNumber(customerTestPhone) || normalizePhoneNumber(phoneNumber) === normalizePhoneNumber(customerTestPhone2)) && otp === testOtp;
         const isBypassRider = phoneNumber && normalizePhoneNumber(phoneNumber) === normalizePhoneNumber(riderTestPhone) && otp === testOtp;
 
         if (isBypassCustomer || isBypassRider) {
@@ -162,7 +164,7 @@ router.post("/verify-firebase", async (req, res) => {
             }
 
             const admin = (await import("../config/firebase.js")).default;
-            
+
             // Verify Firebase Token
             let decodedToken;
             try {
@@ -233,4 +235,4 @@ router.post("/verify-firebase", async (req, res) => {
     }
 });
 
-export default router;
+export default router;
