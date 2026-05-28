@@ -16,10 +16,9 @@ const TEST_PHONES = [
 const TEST_OTP = "123456";
 
 const sendOtpViaMSG91 = async (phoneNumber, otp) => {
-    // MSG91 Flow API — uses registered DLT sender (AQAVPS) as displayed sender
     // MSG91 expects mobile without '+', e.g. "919876543210"
     const mobile = phoneNumber.replace("+", "");
-    const response = await fetch("https://control.msg91.com/api/v5/flow/", {
+    const response = await fetch("https://control.msg91.com/api/v5/otp", {
         method: "POST",
         headers: {
             authkey: process.env.MSG91_AUTH_KEY,
@@ -28,13 +27,8 @@ const sendOtpViaMSG91 = async (phoneNumber, otp) => {
         body: JSON.stringify({
             template_id: process.env.MSG91_TEMPLATE_ID,
             sender: process.env.MSG91_SENDER_ID,
-            short_url: "0",
-            recipients: [
-                {
-                    mobiles: mobile,
-                    numeric: otp,   // maps to ##numeric## in the DLT template
-                },
-            ],
+            mobile,
+            otp,
         }),
     });
     if (!response.ok) {
