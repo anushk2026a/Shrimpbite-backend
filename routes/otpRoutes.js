@@ -26,6 +26,7 @@ const sendOtpViaMSG91 = async (phoneNumber, otp) => {
         },
         body: JSON.stringify({
             template_id: process.env.MSG91_TEMPLATE_ID,
+            sender: process.env.MSG91_SENDER_ID,
             mobile,
             otp,
         }),
@@ -52,8 +53,8 @@ router.post("/send", async (req, res) => {
             lowerCaseAlphabets: false
         });
 
-        // Expiry 5 minutes
-        const expiresAt = new Date(Date.now() + 5 * 60 * 1000);
+        // Expiry 10 minutes (matches DLT template text)
+        const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
 
         // Save/Update OTP in DB
         await Otp.findOneAndUpdate(
