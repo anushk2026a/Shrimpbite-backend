@@ -21,7 +21,7 @@ const notificationSchema = new mongoose.Schema({
         default: "System"
     },
     referenceId: {
-        type: String // Order ID, Rider ID, etc.
+        type: String
     },
     isRead: {
         type: Boolean,
