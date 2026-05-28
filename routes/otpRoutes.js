@@ -2,11 +2,40 @@ import express from "express";
 import otpGenerator from "otp-generator";
 import jwt from "jsonwebtoken";
 import AppUser from "../models/AppUser.js";
-import User from "../models/User.js"; // Added User model import
+import User from "../models/User.js";
 import Otp from "../models/Otp.js";
 import { normalizePhoneNumber } from "../utils/phoneUtils.js";
 
 const router = express.Router();
+
+// Test phone numbers that bypass real SMS (used for App Store / Play Store review)
+const TEST_PHONES = [
+    normalizePhoneNumber("1234512345"),
+    normalizePhoneNumber("1002003004"),
+];
+const TEST_OTP = "123456";
+
+const sendOtpViaMSG91 = async (phoneNumber, otp) => {
+    // MSG91 expects mobile without '+', e.g. "919876543210"
+    const mobile = phoneNumber.replace("+", "");
+    const response = await fetch("https://control.msg91.com/api/v5/otp", {
+        method: "POST",
+        headers: {
+            authkey: process.env.MSG91_AUTH_KEY,
+            "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+            template_id: process.env.MSG91_TEMPLATE_ID,
+            mobile,
+            otp,
+        }),
+    });
+    if (!response.ok) {
+        const text = await response.text();
+        throw new Error(`MSG91 HTTP ${response.status}: ${text}`);
+    }
+    return response.json();
+};
 
 // send otp
 router.post("/send", async (req, res) => {
@@ -33,14 +62,20 @@ router.post("/send", async (req, res) => {
             { upsert: true, new: true }
         );
 
-        console.log(`[OTP] for ${phoneNumber}: ${otpCode}`);
+        // Skip MSG91 for App Store / Play Store review bypass numbers
+        if (!TEST_PHONES.includes(phoneNumber)) {
+            const result = await sendOtpViaMSG91(phoneNumber, otpCode);
+            if (result.type !== "success") {
+                console.error("[MSG91] OTP send failed:", result);
+                return res.status(500).json({ success: false, message: "Failed to send OTP. Please try again." });
+            }
+        }
 
-        console.log(`[OTP Skip Push] Send via SMS using Firebase Phone Auth on client side.`);
+        console.log(`[OTP] Sent to ${phoneNumber}`);
 
         return res.status(200).json({
             success: true,
-            message: "OTP generation requested. Please use Firebase Phone Auth on the client to send SMS.",
-            otp: otpCode // Still returning for dev testing if needed
+            message: "OTP sent successfully",
         });
     } catch (error) {
         console.error("otp send error:", error);
@@ -59,17 +94,11 @@ router.post("/verify", async (req, res) => {
 
         phoneNumber = normalizePhoneNumber(phoneNumber);
 
-        // --- APPLE REVIEW BYPASS ---
-        const customerTestPhone = "1234512345";
-        const customerTestPhone2 = "9090898978";
-        const riderTestPhone = "1002003004";
-        const testOtp = "123456";
+        // --- APP STORE / PLAY STORE REVIEW BYPASS ---
+        const isBypass = TEST_PHONES.includes(phoneNumber) && otp === TEST_OTP;
 
-        const isBypassCustomer = (phoneNumber === normalizePhoneNumber(customerTestPhone) || phoneNumber === normalizePhoneNumber(customerTestPhone2)) && otp === testOtp;
-        const isBypassRider = phoneNumber === normalizePhoneNumber(riderTestPhone) && otp === testOtp;
-
-        if (isBypassCustomer || isBypassRider) {
-            console.log("🍏 Apple Review bypass activated for:", phoneNumber);
+        if (isBypass) {
+            console.log("🍏 Review bypass activated for:", phoneNumber);
         } else {
             const otpRecord = await Otp.findOne({ phoneNumber });
 
@@ -107,7 +136,7 @@ router.post("/verify", async (req, res) => {
             }
         }
 
-        // Mark user as verified if they exist
+        // Mark user as verified
         if (user) {
             user.isVerified = true;
             await user.save();
@@ -144,18 +173,12 @@ router.post("/verify-firebase", async (req, res) => {
     try {
         const { idToken, phoneNumber, otp } = req.body;
 
-        // --- APPLE REVIEW BYPASS ---
-        // If the user enters the specific test numbers and OTP, bypass Firebase completely.
-        const customerTestPhone = "1234512345";
-        const customerTestPhone2 = "9090898978";
-        const riderTestPhone = "1002003004";
-        const testOtp = "123456";
+        // --- APP STORE / PLAY STORE REVIEW BYPASS ---
+        const normalizedPhone = phoneNumber ? normalizePhoneNumber(phoneNumber) : null;
+        const isBypass = normalizedPhone && TEST_PHONES.includes(normalizedPhone) && otp === TEST_OTP;
 
-        const isBypassCustomer = phoneNumber && (normalizePhoneNumber(phoneNumber) === normalizePhoneNumber(customerTestPhone) || normalizePhoneNumber(phoneNumber) === normalizePhoneNumber(customerTestPhone2)) && otp === testOtp;
-        const isBypassRider = phoneNumber && normalizePhoneNumber(phoneNumber) === normalizePhoneNumber(riderTestPhone) && otp === testOtp;
-
-        if (isBypassCustomer || isBypassRider) {
-            console.log("🍏 Apple Review bypass activated for:", phoneNumber);
+        if (isBypass) {
+            console.log("🍏 Review bypass activated for:", phoneNumber);
             // Skip Firebase verification, proceed directly to role check below
         } else {
             // Normal Firebase Flow
@@ -179,8 +202,6 @@ router.post("/verify-firebase", async (req, res) => {
                 return res.status(400).json({ success: false, message: "Phone number not found in Firebase token or request" });
             }
 
-            // Ensure the phoneNumber matches the verified phone (or use the verified one)
-            // But since we are inside the else block, we just set a variable to be used below
             req.verifiedPhoneToUse = verifiedPhone || phoneNumber;
         }
 
