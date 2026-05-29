@@ -1,3 +1,4 @@
+import https from "https";
 import express from "express";
 import otpGenerator from "otp-generator";
 import jwt from "jsonwebtoken";
@@ -15,27 +16,45 @@ const TEST_PHONES = [
 ];
 const TEST_OTP = "123456";
 
-const sendOtpViaMSG91 = async (phoneNumber, otp) => {
-    // MSG91 expects mobile without '+', e.g. "919876543210"
-    const mobile = phoneNumber.replace("+", "");
-    const response = await fetch("https://control.msg91.com/api/v5/otp", {
-        method: "POST",
-        headers: {
-            authkey: process.env.MSG91_AUTH_KEY,
-            "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
+const sendOtpViaMSG91 = (phoneNumber, otp) => {
+    return new Promise((resolve, reject) => {
+        const mobile = phoneNumber.replace("+", "");
+
+        const options = {
+            method: "POST",
+            hostname: "control.msg91.com",
+            port: null,
+            path: "/api/v5/flow",
+            headers: {
+                accept: "application/json",
+                authkey: process.env.MSG91_AUTH_KEY,
+                "content-type": "application/json",
+            },
+        };
+
+        const req = https.request(options, (res) => {
+            const chunks = [];
+            res.on("data", (chunk) => chunks.push(chunk));
+            res.on("end", () => {
+                try {
+                    resolve(JSON.parse(Buffer.concat(chunks).toString()));
+                } catch {
+                    reject(new Error("Invalid JSON response from MSG91"));
+                }
+            });
+        });
+
+        req.on("error", reject);
+
+        req.write(JSON.stringify({
             template_id: process.env.MSG91_TEMPLATE_ID,
-            sender: process.env.MSG91_SENDER_ID,
-            mobile,
-            otp,
-        }),
+            short_url: "0",
+            realTimeResponse: "1",
+            recipients: [{ mobiles: mobile, numeric: otp }],
+        }));
+
+        req.end();
     });
-    if (!response.ok) {
-        const text = await response.text();
-        throw new Error(`MSG91 HTTP ${response.status}: ${text}`);
-    }
-    return response.json();
 };
 
 // send otp
