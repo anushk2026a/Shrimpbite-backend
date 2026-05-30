@@ -31,7 +31,7 @@ const orderSchema = new mongoose.Schema({
             required: false
         },
         weightLabel: {
-            type: String // e.g. "500 Grams" (stored as snapshot)
+            type: String // e.g. "500 Grams" (stored as snapshot here)
         },
         deliveredWeight: Number, // Post-cleaning actual weight
         price: {
