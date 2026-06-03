@@ -166,7 +166,7 @@ router.post("/verify", async (req, res) => {
         await Otp.deleteOne({ phoneNumber });
 
         // Generate token
-        const token = jwt.sign({ id: user._id, role }, process.env.JWT_SECRET, { expiresIn: "7d" });
+        const token = jwt.sign({ id: user._id, role }, process.env.JWT_SECRET, { expiresIn: "30d" });
 
         return res.status(200).json({
             success: true,

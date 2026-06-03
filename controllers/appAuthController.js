@@ -161,7 +161,7 @@ export const loginUser = async (req, res) => {
             await user.save();
         }
 
-        const token = jwt.sign({ id: user._id, role }, process.env.JWT_SECRET, { expiresIn: "7d" });
+        const token = jwt.sign({ id: user._id, role }, process.env.JWT_SECRET, { expiresIn: "30d" });
 
         return res.status(200).json({
             success: true,
@@ -547,7 +547,7 @@ export const googleAuth = async (req, res) => {
         }
 
         // Finalize Login
-        const token = jwt.sign({ id: user._id, role: "customer" }, process.env.JWT_SECRET, { expiresIn: "7d" });
+        const token = jwt.sign({ id: user._id, role: "customer" }, process.env.JWT_SECRET, { expiresIn: "30d" });
 
         return res.status(200).json({
             success: true,

@@ -1,7 +1,7 @@
 import AppUser from "../models/AppUser.js";
 import User from "../models/User.js";
 import Notification from "../models/Notification.js";
-import { sendPushNotification } from "../services/notificationService.js";
+import { sendMulticastNotification } from "../services/notificationService.js";
 import { emitNotification } from "../services/socketService.js";
 
 export const sendBulkNotification = async (req, res) => {
@@ -67,10 +67,9 @@ export const sendBulkNotification = async (req, res) => {
             return res.status(404).json({ success: false, message: "No users found in this segment (Retailers, Riders, or Customers)." });
         }
 
-        // 7. Dispatch FCM only to those in the push list (Customers/Riders)
+        // 7. Dispatch FCM to all tokens in one multicast batch
         if (uniquePushTokens.length > 0) {
-            const pushPromises = uniquePushTokens.map(token => sendPushNotification(token, title, body));
-            await Promise.all(pushPromises);
+            await sendMulticastNotification(uniquePushTokens, title, body);
         }
 
         res.json({ 
