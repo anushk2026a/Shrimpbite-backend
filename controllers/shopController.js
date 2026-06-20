@@ -471,6 +471,7 @@ export const getRetailerOrders = async (req, res) => {
 
         // Fetch all orders containing items from this retailer and populate product, rider, and subscription info
         const orders = await Order.find(query)
+            .populate("user", "fullName name phoneNumber phone")
             .populate("items.product", "name")
             .populate("rider", "name")
             .populate("subscriptionId", "frequency customDays cancelAtMidnight")
@@ -510,6 +511,8 @@ export const getRetailerOrders = async (req, res) => {
 
             formattedOrders.push({
                 id: order.orderId || `#${order._id.toString().slice(-6).toUpperCase()}`,
+                dbId: order._id,
+                customerName: order.user?.fullName || order.user?.name || order.user?.phoneNumber || order.user?.phone || "Customer",
                 product: productNames.join(", "),
                 date: new Date(order.createdAt).toLocaleString("en-IN", {
                     timeZone: "Asia/Kolkata",

@@ -87,7 +87,9 @@ export const finalizeOrder = async (orderId, razorpayPaymentId, razorpaySignatur
 
         // 6. Notifications for all Retailers
         try {
-            const populatedOrder = await Order.findById(order._id).populate("items.product", "name");
+            const populatedOrder = await Order.findById(order._id)
+                .populate("items.product", "name")
+                .populate("user", "fullName phoneNumber");
             const retailerIds = [...new Set(order.items.map(item => item.retailer.toString()))];
 
             for (const retailerId of retailerIds) {

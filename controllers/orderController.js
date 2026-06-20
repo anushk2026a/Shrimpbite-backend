@@ -172,7 +172,9 @@ export const placeOrder = async (req, res) => {
             await Cart.findOneAndDelete({ user: userId });
 
             // Socket & Push Notifications for each retailer
-            const populatedOrder = await Order.findById(order._id).populate("items.product", "name");
+            const populatedOrder = await Order.findById(order._id)
+                .populate("items.product", "name")
+                .populate("user", "fullName phoneNumber");
             const retailerIds = [...new Set(orderItems.map(item => item.retailer.toString()))];
 
             for (const retailerId of retailerIds) {
