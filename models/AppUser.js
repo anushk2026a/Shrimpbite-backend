@@ -46,6 +46,8 @@ const appUserSchema = new mongoose.Schema(
                 city: String,
                 state: String,
                 pincode: String,
+                latitude: Number,
+                longitude: Number,
                 isDefault: { type: Boolean, default: false }
             }
         ],
