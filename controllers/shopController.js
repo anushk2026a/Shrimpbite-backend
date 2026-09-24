@@ -48,7 +48,10 @@ export const getPublicShops = async (req, res) => {
                     location: shop.businessDetails?.location?.city || "",
                     isShopActive: shop.isShopActive ?? false,
                     rating: rating,
-                    deliveryTime: "30-45 mins"
+                    deliveryTime: "30-45 mins",
+                    latitude: shop.businessDetails?.location?.latitude,
+                    longitude: shop.businessDetails?.location?.longitude,
+                    deliveryRadius: shop.businessDetails?.location?.deliveryRadius ?? 10
                 });
             }
         }

@@ -1,0 +1,14 @@
+Super Admin	iscshrimp@gmail.com	admin	approved
+Punam Vilas Autade	yamuna@gmail.com	retailer	approved
+Hello	pritamcodeservir@gmail.com	retailer	draft
+Punam Vilas Autade	teerth@gmail.com	retailer	approved
+Punam Vilas Autade	pragati@gmail.com	retailer	approved
+Dinesh kumar	dineshkumartlbupi@gmail.com	retailer	under_review
+Amar Maurya	amarmauryagmnb@gmail.com	retailer	draft
+test	test@gmail.com	retailer	under_review
+Test Rider	rider_10020030004_1776929582927@shrimpbite.internal	rider	approved
+11:06
+
+
+Email: iscshrimp@gmail.com
+Password: Shrimp@bite026

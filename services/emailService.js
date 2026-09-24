@@ -38,3 +38,18 @@ export const sendWelcomeEmail = async (email, name) => {
 
     await transporter.sendMail(mailOptions);
 };
+export const sendAdminAlertEmail = async (emails, subject, htmlContent) => {
+    if (!emails || emails.length === 0) return;
+    try {
+        const mailOptions = {
+            from: `"ShrimpBite System 🦐" <${process.env.EMAIL_USER}>`,
+            bcc: emails, // Use BCC so admins don't see each other's emails
+            subject,
+            html: htmlContent
+        };
+        await transporter.sendMail(mailOptions);
+        console.log(`[Email Service] Sent admin alert: ${subject}`);
+    } catch (err) {
+        console.error("[Email Service] Failed to send admin alert:", err.message);
+    }
+};

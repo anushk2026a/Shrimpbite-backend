@@ -18,6 +18,7 @@ import {
     updateSubscriptionPlan,
     deleteSubscriptionPlan
 } from "../controllers/subscriptionController.js";
+import { getSettings, updateSettings } from "../controllers/settingsController.js";
 import { protect, adminOnly, checkModuleAccess } from "../middleware/authMiddleware.js";
 
 const router = express.Router()
@@ -25,6 +26,10 @@ const router = express.Router()
 // Use protect and adminOnly for ALL routes in this file
 router.use(protect);
 router.use(adminOnly);
+
+// Settings (Requires Dashboard or System access)
+router.get("/settings", getSettings);
+router.post("/settings", updateSettings);
 
 // Dashboard
 router.get("/dashboard-stats", checkModuleAccess("Dashboard"), getDashboardStats)
