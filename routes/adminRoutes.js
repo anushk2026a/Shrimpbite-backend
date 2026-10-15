@@ -19,6 +19,7 @@ import {
     deleteSubscriptionPlan
 } from "../controllers/subscriptionController.js";
 import { getSettings, updateSettings } from "../controllers/settingsController.js";
+import { getAllTransactions } from "../controllers/transactionController.js";
 import { protect, adminOnly, checkModuleAccess } from "../middleware/authMiddleware.js";
 
 const router = express.Router()
@@ -59,5 +60,8 @@ router.get("/orders", checkModuleAccess("Order Management"), getAllOrders)
 // Account Deletion Requests
 router.get("/account-deletion-requests", checkModuleAccess("App Users"), getAccountDeletionRequests)
 router.put("/account-deletion-requests/:id", checkModuleAccess("App Users"), updateAccountDeletionRequest)
+
+// Transactions
+router.get("/transactions", getAllTransactions)
 
 export default router
