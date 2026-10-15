@@ -1,14 +1,17 @@
 import nodemailer from "nodemailer";
 
-const transporter = nodemailer.createTransport({
-    service: "gmail",
-    auth: {
-        user: process.env.EMAIL_USER,
-        pass: process.env.EMAIL_PASS
-    }
-});
+const getTransporter = () => {
+    return nodemailer.createTransport({
+        service: "gmail",
+        auth: {
+            user: process.env.EMAIL_USER,
+            pass: process.env.EMAIL_PASS
+        }
+    });
+};
 
 export const sendWelcomeEmail = async (email, name) => {
+    const transporter = getTransporter();
     const mailOptions = {
         from: `"ShrimpBite 🦐" <${process.env.EMAIL_USER}>`,
         to: email,
@@ -41,14 +44,15 @@ export const sendWelcomeEmail = async (email, name) => {
 export const sendAdminAlertEmail = async (emails, subject, htmlContent) => {
     if (!emails || emails.length === 0) return;
     try {
+        const transporter = getTransporter();
         const mailOptions = {
             from: `"ShrimpBite System 🦐" <${process.env.EMAIL_USER}>`,
             bcc: emails, // Use BCC so admins don't see each other's emails
             subject,
             html: htmlContent
         };
-        await transporter.sendMail(mailOptions);
-        console.log(`[Email Service] Sent admin alert: ${subject}`);
+        const info = await transporter.sendMail(mailOptions);
+        console.log(`[Email Service] Sent admin alert: ${subject} (${info.response})`);
     } catch (err) {
         console.error("[Email Service] Failed to send admin alert:", err.message);
     }

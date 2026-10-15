@@ -6,6 +6,7 @@ import User from "../models/User.js";
 import Otp from "../models/Otp.js";
 import AccountDeletionRequest from "../models/AccountDeletionRequest.js";
 import { sendWelcomeEmail } from "../services/emailService.js";
+import { dispatchAdminAlert } from "../services/adminAlertService.js";
 import admin from "firebase-admin";
 import { normalizePhoneNumber } from "../utils/phoneUtils.js";
 
@@ -93,6 +94,13 @@ export const registerUser = async (req, res) => {
                 console.log("Welcome email failed:", error.message);
             }
         }
+
+        // Send alert to Admins for newly registered customer
+        dispatchAdminAlert("newCustomer", {
+            name: newUser.fullName,
+            phone: newUser.phoneNumber,
+            email: newUser.email
+        }).catch(err => console.error("[Admin Alert] Error sending new customer alert:", err.message));
 
         // 6.1 fcmToken assignment
         const { fcmToken } = req.body;
@@ -526,6 +534,13 @@ export const googleAuth = async (req, res) => {
             } catch (error) {
                 console.log("Welcome email failed:", error.message);
             }
+
+            // Send alert to Admins for newly registered customer
+            dispatchAdminAlert("newCustomer", {
+                name: user.fullName,
+                phone: user.phoneNumber || "Google Sign-in",
+                email: user.email
+            }).catch(err => console.error("[Admin Alert] Error sending new customer alert:", err.message));
         } else {
             // Existing user flow - Ensure fields are updated if needed
             let updated = false;

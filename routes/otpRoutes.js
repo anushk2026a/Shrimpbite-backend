@@ -6,6 +6,7 @@ import AppUser from "../models/AppUser.js";
 import User from "../models/User.js";
 import Otp from "../models/Otp.js";
 import { normalizePhoneNumber } from "../utils/phoneUtils.js";
+import { dispatchAdminAlert } from "../services/adminAlertService.js";
 
 const router = express.Router();
 
@@ -146,6 +147,7 @@ router.post("/verify", async (req, res) => {
         } else {
             // 2. Check if it's an existing Customer
             user = await AppUser.findOne({ phoneNumber });
+            let isNewCustomer = false;
             if (!user) {
                 // 3. Auto-register as new Customer
                 user = await AppUser.create({
@@ -153,6 +155,7 @@ router.post("/verify", async (req, res) => {
                     phoneNumber: phoneNumber,
                     isVerified: true
                 });
+                isNewCustomer = true;
             }
         }
 
@@ -160,6 +163,15 @@ router.post("/verify", async (req, res) => {
         if (user) {
             user.isVerified = true;
             await user.save();
+        }
+
+        // Send alert to Admins for newly registered customer
+        if (isNewCustomer && user) {
+            dispatchAdminAlert("newCustomer", {
+                name: user.fullName || "Shrimpbite User",
+                phone: user.phoneNumber,
+                email: user.email || ""
+            }).catch(err => console.error("[Admin Alert] Error sending new customer alert:", err.message));
         }
 
         // Delete OTP after successful verification

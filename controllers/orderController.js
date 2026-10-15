@@ -6,6 +6,7 @@ import Subscription from "../models/Subscription.js";
 import * as walletService from "../services/walletService.js";
 import { emitOrderUpdate } from "../services/socketService.js";
 import { createNotification } from "../services/notificationService.js";
+import { dispatchAdminAlert } from "../services/adminAlertService.js";
 import { createRazorpayOrder, verifyRazorpaySignature } from "../services/razorpayService.js";
 import { finalizeOrder } from "../services/orderService.js";
 
@@ -184,6 +185,15 @@ export const placeOrder = async (req, res) => {
                     message: `You have a new order (#${order._id.toString().slice(-6)}) for ₹${totalAmount}.`,
                     type: "Order",
                     referenceId: order._id.toString()
+                });
+
+                // Dispatch email alert to Admins
+                dispatchAdminAlert("newOrder", {
+                    orderId: order.orderId || order._id.toString(),
+                    customerName: userProfile?.fullName || "Customer",
+                    totalAmount,
+                    shopName: "A Retailer"
+
                 });
             }
         }
