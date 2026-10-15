@@ -70,6 +70,66 @@ export const dispatchAdminAlert = async (alertType, data) => {
             `;
             await sendAdminAlertEmail(emails, subject, html);
         }
+
+        if (alertType === 'razorpayPayment') {
+            const amountFormatted = Number(data.amount).toFixed(2);
+            const customerName = data.customerName || "Customer";
+            const subject = `💳 Razorpay Payment Received: ₹${amountFormatted} (${customerName})`;
+            const html = `
+                <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 24px; border: 1px solid #e2e8f0; border-radius: 12px; background: #ffffff;">
+                    <div style="text-align: center; margin-bottom: 20px;">
+                        <h2 style="color: #0284c7; margin: 0; font-size: 22px;">Razorpay Payment Received! 💳</h2>
+                        <p style="color: #64748b; font-size: 14px; margin-top: 6px;">A customer payment has been verified and settled via Razorpay.</p>
+                    </div>
+                    <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; padding: 18px; margin-bottom: 20px;">
+                        <table style="width: 100%; border-collapse: collapse; font-size: 14px;">
+                            <tr>
+                                <td style="padding: 8px 0; color: #64748b; font-weight: 600; width: 140px;">Amount:</td>
+                                <td style="padding: 8px 0; color: #16a34a; font-weight: 800; font-size: 20px;">₹${amountFormatted}</td>
+                            </tr>
+                            <tr>
+                                <td style="padding: 8px 0; color: #64748b; font-weight: 600;">Customer:</td>
+                                <td style="padding: 8px 0; color: #1e293b; font-weight: bold;">${customerName}</td>
+                            </tr>
+                            <tr>
+                                <td style="padding: 8px 0; color: #64748b; font-weight: 600;">Contact:</td>
+                                <td style="padding: 8px 0; color: #1e293b; font-weight: bold;">${data.customerPhone || 'N/A'}</td>
+                            </tr>
+                            ${data.customerEmail ? `
+                            <tr>
+                                <td style="padding: 8px 0; color: #64748b; font-weight: 600;">Email:</td>
+                                <td style="padding: 8px 0; color: #1e293b;">${data.customerEmail}</td>
+                            </tr>` : ''}
+                            <tr>
+                                <td style="padding: 8px 0; color: #64748b; font-weight: 600;">Description:</td>
+                                <td style="padding: 8px 0; color: #1e293b;">${data.description || 'Order Payment'}</td>
+                            </tr>
+                            ${data.orderId ? `
+                            <tr>
+                                <td style="padding: 8px 0; color: #64748b; font-weight: 600;">Order ID:</td>
+                                <td style="padding: 8px 0; color: #1e293b; font-weight: bold;">#${data.orderId}</td>
+                            </tr>` : ''}
+                            ${data.razorpayPaymentId ? `
+                            <tr>
+                                <td style="padding: 8px 0; color: #64748b; font-weight: 600;">Payment ID:</td>
+                                <td style="padding: 8px 0; color: #64748b; font-family: monospace;">${data.razorpayPaymentId}</td>
+                            </tr>` : ''}
+                            ${data.razorpayOrderId ? `
+                            <tr>
+                                <td style="padding: 8px 0; color: #64748b; font-weight: 600;">Razorpay Order:</td>
+                                <td style="padding: 8px 0; color: #64748b; font-family: monospace;">${data.razorpayOrderId}</td>
+                            </tr>` : ''}
+                            <tr>
+                                <td style="padding: 8px 0; color: #64748b; font-weight: 600;">Settlement Date:</td>
+                                <td style="padding: 8px 0; color: #1e293b;">${new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })}</td>
+                            </tr>
+                        </table>
+                    </div>
+                    <p style="text-align: center; color: #94a3b8; font-size: 12px; margin: 0;">Shrimpbite Payment & Accounting System</p>
+                </div>
+            `;
+            await sendAdminAlertEmail(emails, subject, html);
+        }
     } catch (err) {
         console.error("[Admin Alert Service] Error dispatching alert:", err.message);
     }

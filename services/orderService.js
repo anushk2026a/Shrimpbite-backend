@@ -5,6 +5,7 @@ import Cart from "../models/Cart.js";
 import Transaction from "../models/Transaction.js";
 import { createNotification } from "./notificationService.js";
 import { emitOrderUpdate } from "./socketService.js";
+import { dispatchAdminAlert } from "./adminAlertService.js";
 
 export const finalizeOrder = async (orderId, razorpayPaymentId, razorpaySignature) => {
     try {
@@ -89,7 +90,7 @@ export const finalizeOrder = async (orderId, razorpayPaymentId, razorpaySignatur
         try {
             const populatedOrder = await Order.findById(order._id)
                 .populate("items.product", "name")
-                .populate("user", "fullName phoneNumber");
+                .populate("user", "fullName phoneNumber email");
             const retailerIds = [...new Set(order.items.map(item => item.retailer.toString()))];
 
             for (const retailerId of retailerIds) {
@@ -101,6 +102,26 @@ export const finalizeOrder = async (orderId, razorpayPaymentId, razorpaySignatur
                     referenceId: order._id.toString()
                 });
             }
+
+            // 7. Dispatch Admin Email Alert for Razorpay Payment & Order
+            dispatchAdminAlert("razorpayPayment", {
+                amount: order.totalAmount,
+                customerName: populatedOrder?.user?.fullName || "Customer",
+                customerPhone: populatedOrder?.user?.phoneNumber || "",
+                customerEmail: populatedOrder?.user?.email || "",
+                description: `Payment for Order #${order.orderId}`,
+                orderId: order.orderId,
+                razorpayPaymentId,
+                razorpayOrderId: order.razorpayOrderId
+            }).catch(err => console.error("[Admin Alert] Razorpay payment alert failed:", err.message));
+
+            dispatchAdminAlert("newOrder", {
+                orderId: order.orderId || order._id.toString(),
+                customerName: populatedOrder?.user?.fullName || "Customer",
+                totalAmount: order.totalAmount,
+                shopName: "Retailer Shop"
+            }).catch(err => console.error("[Admin Alert] New order alert failed:", err.message));
+
         } catch (notifyError) {
             console.error("Notification failed:", notifyError.message);
         }

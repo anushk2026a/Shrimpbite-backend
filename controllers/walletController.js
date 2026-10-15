@@ -1,5 +1,6 @@
 import * as walletService from "../services/walletService.js";
 import { verifyRazorpaySignature } from "../services/razorpayService.js";
+import { dispatchAdminAlert } from "../services/adminAlertService.js";
 
 export const getBalance = async (req, res) => {
     try {
@@ -48,6 +49,17 @@ export const topUpSuccess = async (req, res) => {
             "Razorpay",
             razorpayOrderId
         );
+
+        dispatchAdminAlert("razorpayPayment", {
+            amount,
+            customerName: req.user?.fullName || "Customer",
+            customerPhone: req.user?.phoneNumber || req.user?.phone || "",
+            customerEmail: req.user?.email || "",
+            description: "Wallet Top-up",
+            razorpayPaymentId,
+            razorpayOrderId
+        }).catch(err => console.error("[Admin Alert] Wallet top-up payment alert failed:", err.message));
+
         res.status(200).json(result);
     } catch (error) {
         res.status(500).json({ success: false, message: error.message });
