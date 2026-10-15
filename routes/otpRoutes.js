@@ -139,6 +139,7 @@ router.post("/verify", async (req, res) => {
         // --- TIERED ROLE CHECK ---
         let user = null;
         let role = "customer";
+        let isNewCustomer = false;
 
         // 1. Check if it's a Rider
         user = await User.findOne({ phone: phoneNumber, role: "rider" });
@@ -147,7 +148,6 @@ router.post("/verify", async (req, res) => {
         } else {
             // 2. Check if it's an existing Customer
             user = await AppUser.findOne({ phoneNumber });
-            let isNewCustomer = false;
             if (!user) {
                 // 3. Auto-register as new Customer
                 user = await AppUser.create({
