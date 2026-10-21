@@ -33,8 +33,35 @@ export const updateDeliveryStatus = async (req, res) => {
             return res.status(400).json({ success: false, message: `Order is already in '${status}' status.` });
         }
 
+        // 🛡️ Delivery OTP Verification: Rider CANNOT mark Delivered without customer OTP
+        if (status === "Delivered") {
+            const { otp } = req.body;
+            if (order.deliveryOtp) {
+                if (!otp || otp.toString().trim() !== order.deliveryOtp.toString().trim()) {
+                    return res.status(400).json({
+                        success: false,
+                        message: "Invalid or missing Delivery OTP. Please ask the customer for their 4-digit delivery PIN."
+                    });
+                }
+                order.isOtpVerified = true;
+            }
+            order.deliveredAt = new Date();
+        }
+
+        // If dispatching out for delivery, ensure deliveryOtp exists and alert customer
+        if (status === "Shipped" || status === "Out for Delivery") {
+            if (!order.deliveryOtp) {
+                order.deliveryOtp = Math.floor(1000 + Math.random() * 9000).toString();
+            }
+            createNotification(order.user.toString(), {
+                title: `Delivery Code: ${order.deliveryOtp} 🛵`,
+                message: `Your rider is on the way! Please share Delivery Code ${order.deliveryOtp} upon package arrival.`,
+                type: "Order",
+                referenceId: orderId
+            });
+        }
+
         order.status = status;
-        if (status === "Delivered") order.deliveredAt = new Date();
         order.items.forEach(item => { item.status = status; });
 
         // Push to statusHistory
@@ -132,11 +159,22 @@ export const updateRiderLocation = async (req, res) => {
 
 export const completeDelivery = async (req, res) => {
     try {
-        const { orderId, itemWeights } = req.body; // itemWeights: [{ productId, weight }]
+        const { orderId, itemWeights, otp } = req.body; // itemWeights: [{ productId, weight }]
         const riderId = req.user.id;
 
         const order = await Order.findOne({ orderId, rider: riderId }).populate("items.product");
         if (!order) return res.status(404).json({ success: false, message: "Order not found or not assigned to you" });
+
+        // 🛡️ Delivery OTP Verification
+        if (order.deliveryOtp) {
+            if (!otp || otp.toString().trim() !== order.deliveryOtp.toString().trim()) {
+                return res.status(400).json({
+                    success: false,
+                    message: "Invalid or missing Delivery OTP. Please ask the customer for their 4-digit delivery PIN."
+                });
+            }
+            order.isOtpVerified = true;
+        }
 
         let totalRefund = 0;
         const updatedItems = order.items.map(item => {

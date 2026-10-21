@@ -3,6 +3,7 @@ import Cart from "../models/Cart.js";
 import Product from "../models/Product.js";
 import AppUser from "../models/AppUser.js";
 import Subscription from "../models/Subscription.js";
+import Coupon from "../models/Coupon.js";
 import * as walletService from "../services/walletService.js";
 import { emitOrderUpdate } from "../services/socketService.js";
 import { createNotification } from "../services/notificationService.js";
@@ -13,7 +14,7 @@ import { finalizeOrder } from "../services/orderService.js";
 export const placeOrder = async (req, res) => {
     try {
         const userId = req.userId;
-        let { deliveryAddress, paymentMethod, orderType, items: bodyItems } = req.body;
+        let { deliveryAddress, paymentMethod, orderType, items: bodyItems, couponCode } = req.body;
 
         // 1. Fetch Cart or use Body Items
         let itemsToProcess = [];
@@ -112,6 +113,34 @@ export const placeOrder = async (req, res) => {
             return res.status(400).json({ success: false, message: "Retailer not identified for items" });
         }
 
+        // 2.0 Apply Coupon Discount if couponCode provided
+        let discountAmount = 0;
+        let appliedCoupon = null;
+        if (couponCode) {
+            const cleanCode = couponCode.trim().toUpperCase();
+            const coupon = await Coupon.findOne({ code: cleanCode, isActive: true });
+            if (coupon) {
+                const now = new Date();
+                const isValidDate = (!coupon.validFrom || now >= coupon.validFrom) && (!coupon.validUntil || now <= coupon.validUntil);
+                const isUnderLimit = !coupon.usageLimit || coupon.usageCount < coupon.usageLimit;
+                const meetsMin = !coupon.minOrderValue || totalAmount >= coupon.minOrderValue;
+                if (isValidDate && isUnderLimit && meetsMin) {
+                    if (coupon.discountType === "percentage") {
+                        discountAmount = (totalAmount * coupon.discountValue) / 100;
+                        if (coupon.maxDiscountAmount && discountAmount > coupon.maxDiscountAmount) {
+                            discountAmount = coupon.maxDiscountAmount;
+                        }
+                    } else {
+                        discountAmount = coupon.discountValue;
+                    }
+                    if (discountAmount > totalAmount) discountAmount = totalAmount;
+                    discountAmount = Math.round(discountAmount * 100) / 100;
+                    totalAmount = Math.max(0, Math.round((totalAmount - discountAmount) * 100) / 100);
+                    appliedCoupon = coupon;
+                }
+            }
+        }
+
         // 2.1 Wallet Balance Check (Only if not Razorpay)
         if (paymentMethod === "Wallet") {
             const user = await AppUser.findById(userId);
@@ -131,8 +160,9 @@ export const placeOrder = async (req, res) => {
             razorpayOrderId = rzpOrder.id;
         }
 
-        // 4. Generate Order ID
+        // 4. Generate Order ID & 4-digit Delivery OTP
         const orderId = `ORD-${Date.now()}-${Math.floor(1000 + Math.random() * 9000)}`;
+        const deliveryOtp = Math.floor(1000 + Math.random() * 9000).toString();
 
         // 5. Create Order
         const order = await Order.create({
@@ -140,6 +170,9 @@ export const placeOrder = async (req, res) => {
             user: userId,
             items: orderItems,
             totalAmount,
+            couponCode: appliedCoupon ? appliedCoupon.code : null,
+            discountAmount,
+            deliveryOtp,
             deliveryAddress,
             paymentMethod,
             paymentStatus: paymentMethod === "Wallet" ? "Paid" : "Pending",
@@ -147,6 +180,18 @@ export const placeOrder = async (req, res) => {
             orderType: orderType || "One-time",
             razorpayOrderId
         });
+
+        // Track coupon redemption
+        if (appliedCoupon) {
+            appliedCoupon.usageCount = (appliedCoupon.usageCount || 0) + 1;
+            appliedCoupon.usedBy.push({
+                user: userId,
+                orderId: order.orderId,
+                discountGiven: discountAmount,
+                usedAt: new Date()
+            });
+            await appliedCoupon.save();
+        }
 
         // 6. Final Steps for Wallet Orders (Stock deduction, notifications, etc.)
         // For Razorpay, these will happen in verify-payment

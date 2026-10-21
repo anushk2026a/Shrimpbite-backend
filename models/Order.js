@@ -48,6 +48,31 @@ const orderSchema = new mongoose.Schema({
         type: Number,
         required: true
     },
+    couponCode: {
+        type: String,
+        default: null
+    },
+    discountAmount: {
+        type: Number,
+        default: 0
+    },
+    deliveryOtp: {
+        type: String,
+        default: null
+    },
+    isOtpVerified: {
+        type: Boolean,
+        default: false
+    },
+    isManualPosOrder: {
+        type: Boolean,
+        default: false
+    },
+    posPaymentType: {
+        type: String,
+        enum: ["Paid", "Dues", null],
+        default: null
+    },
     status: {
         type: String,
         enum: ["Payment Pending", "Pending", "Accepted", "Processing", "Preparing", "Shipped", "Out for Delivery", "Delivered", "Completed", "Cancelled", "Rider Assigned", "Rider Accepted"],
@@ -79,7 +104,7 @@ const orderSchema = new mongoose.Schema({
     },
     paymentMethod: {
         type: String,
-        enum: ["Wallet", "Razorpay"],
+        enum: ["Wallet", "Razorpay", "Cash", "UPI", "POS_Dues"],
         required: true
     },
     rider: {

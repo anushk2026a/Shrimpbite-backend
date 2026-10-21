@@ -6,6 +6,8 @@ import { adjustBalance } from "../services/walletService.js";
 import { emitOrderUpdate, emitShopStatusUpdate } from "../services/socketService.js";
 import { createNotification } from "../services/notificationService.js";
 import OrderReview from "../models/OrderReview.js";
+import AppUser from "../models/AppUser.js";
+import Subscription from "../models/Subscription.js";
 
 // Helper function to calculate shop rating
 const calculateShopRating = async (retailerId) => {
@@ -376,6 +378,23 @@ export const getRetailerCustomers = async (req, res) => {
                 if (new Date(order.createdAt) < new Date(customerData.firstOrderDate)) {
                     customerData.firstOrderDate = order.createdAt;
                 }
+            }
+        });
+
+        // Include manual customers added by this retailer who haven't placed orders yet
+        const manualCustomers = await AppUser.find({ addedByRetailer: retailerId }).lean();
+        manualCustomers.forEach(cust => {
+            const customerId = cust._id.toString();
+            if (!customerMap.has(customerId)) {
+                customerMap.set(customerId, {
+                    user: cust,
+                    orderCount: 0,
+                    totalSpend: 0,
+                    orderIds: [],
+                    firstOrderDate: cust.createdAt,
+                    lastOrderDate: cust.createdAt,
+                    isManualCustomer: true
+                });
             }
         });
 
@@ -891,6 +910,270 @@ export const deleteBankAccount = async (req, res) => {
         res.status(200).json({ success: true, message: "Bank account deleted successfully", bankAccounts: user.bankAccounts });
     } catch (error) {
         console.error(`[BANK_DELETE] Error deleting bank ${bankId}:`, error);
+        res.status(500).json({ success: false, message: error.message });
+    }
+};
+
+/**
+ * POST /api/retailer/customers
+ * Retailer adds a walk-in / manual customer
+ */
+export const addRetailerCustomer = async (req, res) => {
+    try {
+        const retailerId = req.userId || req.user._id;
+        const { fullName, phoneNumber, email, address, city, state, pincode } = req.body;
+
+        if (!fullName || !phoneNumber) {
+            return res.status(400).json({ success: false, message: "Customer name and phone number are required" });
+        }
+
+        let cleanPhone = phoneNumber.trim();
+        if (!cleanPhone.startsWith("+")) {
+            cleanPhone = cleanPhone.startsWith("91") ? `+${cleanPhone}` : `+91${cleanPhone.replace(/^0+/, "")}`;
+        }
+
+        let customer = await AppUser.findOne({ phoneNumber: cleanPhone });
+        if (customer) {
+            customer.addedByRetailer = retailerId;
+            if (address && (!customer.addresses || customer.addresses.length === 0)) {
+                customer.addresses = [{
+                    label: "Home",
+                    fullAddress: address,
+                    city: city || "Bangalore",
+                    state: state || "Karnataka",
+                    pincode: pincode || "",
+                    isDefault: true
+                }];
+            }
+            await customer.save();
+            return res.status(200).json({
+                success: true,
+                message: "Existing customer linked to your store successfully",
+                data: customer
+            });
+        }
+
+        customer = await AppUser.create({
+            fullName: fullName.trim(),
+            phoneNumber: cleanPhone,
+            email: email ? email.trim().toLowerCase() : undefined,
+            isVerified: true,
+            isManualCustomer: true,
+            addedByRetailer: retailerId,
+            addresses: address ? [{
+                label: "Home",
+                fullAddress: address,
+                city: city || "Bangalore",
+                state: state || "Karnataka",
+                pincode: pincode || "",
+                isDefault: true
+            }] : []
+        });
+
+        res.status(201).json({
+            success: true,
+            message: "Customer added successfully",
+            data: customer
+        });
+    } catch (error) {
+        console.error("Add Retailer Customer Error:", error);
+        res.status(500).json({ success: false, message: error.message });
+    }
+};
+
+/**
+ * POST /api/retailer/pos-order
+ * Retailer creates an on-demand One-time or Subscription order directly for customer
+ * Supports Paid vs Dues option & auto-assigns deliveryOtp
+ */
+export const createRetailerPosOrder = async (req, res) => {
+    try {
+        const retailerId = req.userId || req.user._id;
+        const {
+            customerId,
+            items,
+            orderType = "One-time",
+            subscriptionFrequency = "Daily",
+            posPaymentType = "Paid", // "Paid" | "Dues"
+            paymentMethod = "Cash", // "Cash" | "UPI" | "POS_Dues"
+            deliveryAddress
+        } = req.body;
+
+        if (!customerId) {
+            return res.status(400).json({ success: false, message: "Customer is required" });
+        }
+        if (!items || !Array.isArray(items) || items.length === 0) {
+            return res.status(400).json({ success: false, message: "At least one item must be added to order" });
+        }
+
+        const customer = await AppUser.findById(customerId);
+        if (!customer) {
+            return res.status(404).json({ success: false, message: "Customer not found" });
+        }
+
+        let totalAmount = 0;
+        const orderItems = [];
+
+        for (const itm of items) {
+            const product = await Product.findById(itm.productId);
+            if (!product) {
+                return res.status(404).json({ success: false, message: `Product not found: ${itm.productId}` });
+            }
+
+            let price = product.price;
+            let weightToReduce = Number(itm.quantity) || 1;
+            let weightLabel = itm.weightLabel || `${weightToReduce} kg`;
+
+            if (product.variants && product.variants.length > 0 && itm.variantId) {
+                const variant = product.variants.id(itm.variantId);
+                if (variant) {
+                    price = variant.price;
+                    weightToReduce = variant.weightInKg * (Number(itm.quantity) || 1);
+                    weightLabel = variant.weight;
+                }
+            }
+
+            // Deduct stock if available
+            if (product.stock >= weightToReduce) {
+                product.stock -= weightToReduce;
+                await product.save();
+            }
+
+            const itemQty = Number(itm.quantity) || 1;
+            const itemTotal = price * itemQty;
+            totalAmount += itemTotal;
+
+            orderItems.push({
+                product: product._id,
+                variantId: itm.variantId || null,
+                weightLabel,
+                retailer: retailerId,
+                quantity: itemQty,
+                price,
+                status: "Accepted"
+            });
+        }
+
+        // Generate 4-digit Delivery OTP
+        const deliveryOtp = Math.floor(1000 + Math.random() * 9000).toString();
+        const orderId = `POS-${Date.now()}-${Math.floor(1000 + Math.random() * 9000)}`;
+
+        const order = await Order.create({
+            orderId,
+            user: customer._id,
+            items: orderItems,
+            totalAmount: Math.round(totalAmount * 100) / 100,
+            deliveryAddress: deliveryAddress || {
+                address: customer.addresses?.[0]?.fullAddress || "Store Counter Pickup",
+                city: customer.addresses?.[0]?.city || "Bangalore",
+                state: customer.addresses?.[0]?.state || "Karnataka",
+                pincode: customer.addresses?.[0]?.pincode || ""
+            },
+            orderType: orderType || "One-time",
+            paymentStatus: posPaymentType === "Paid" ? "Paid" : "Pending",
+            paymentMethod: posPaymentType === "Dues" ? "POS_Dues" : (paymentMethod || "Cash"),
+            posPaymentType: posPaymentType || "Paid",
+            isManualPosOrder: true,
+            deliveryOtp,
+            status: "Accepted"
+        });
+
+        // Handle subscription if selected
+        let createdSubscription = null;
+        if (orderType === "Subscription" && orderItems.length > 0) {
+            createdSubscription = await Subscription.create({
+                user: customer._id,
+                product: orderItems[0].product,
+                retailer: retailerId,
+                frequency: subscriptionFrequency || "Daily",
+                quantity: orderItems[0].quantity,
+                variantId: orderItems[0].variantId,
+                weightLabel: orderItems[0].weightLabel,
+                status: "Active",
+                startDate: new Date()
+            });
+            order.subscriptionId = createdSubscription._id;
+            await order.save();
+        }
+
+        // Notify customer
+        createNotification(customer._id.toString(), {
+            title: `Order Created by Store! 🧾`,
+            message: `Order #${orderId} for ₹${order.totalAmount} created (${posPaymentType === 'Paid' ? 'PAID' : 'DUES PENDING'}). Delivery Code: ${deliveryOtp}`,
+            type: "Order",
+            referenceId: orderId
+        });
+
+        res.status(201).json({
+            success: true,
+            message: `Order #${orderId} created successfully (${posPaymentType === 'Paid' ? 'PAID' : 'DUES'})`,
+            data: {
+                order,
+                deliveryOtp,
+                subscription: createdSubscription
+            }
+        });
+    } catch (error) {
+        console.error("Create Retailer POS Order Error:", error);
+        res.status(500).json({ success: false, message: error.message });
+    }
+};
+
+/**
+ * GET /api/retailer/pos-order/:orderId/invoice
+ * Formats printable Bill / Invoice data
+ */
+export const getRetailerPosInvoice = async (req, res) => {
+    try {
+        const { orderId } = req.params;
+        const retailerId = req.userId || req.user._id;
+
+        const order = await Order.findOne({ orderId })
+            .populate("items.product", "name sku")
+            .populate("user", "fullName phoneNumber email addresses")
+            .populate("items.retailer", "name businessDetails email phone");
+
+        if (!order) {
+            return res.status(404).json({ success: false, message: "Order not found" });
+        }
+
+        const retailer = await User.findById(retailerId).lean();
+
+        res.status(200).json({
+            success: true,
+            data: {
+                orderId: order.orderId,
+                orderDate: order.createdAt,
+                orderType: order.orderType,
+                paymentStatus: order.paymentStatus,
+                paymentMethod: order.paymentMethod,
+                posPaymentType: order.posPaymentType,
+                deliveryOtp: order.deliveryOtp,
+                customer: {
+                    name: order.user?.fullName || "Walk-in Customer",
+                    phone: order.user?.phoneNumber || "",
+                    address: order.deliveryAddress?.address || "Store Pickup"
+                },
+                store: {
+                    name: retailer?.businessDetails?.shopName || retailer?.name || "Shrimpbite Store",
+                    phone: retailer?.phone || retailer?.businessDetails?.phone || "",
+                    address: retailer?.businessDetails?.location?.address || "",
+                    gstin: retailer?.businessDetails?.gstin || "N/A"
+                },
+                items: order.items.map(i => ({
+                    name: i.product?.name || "Seafood Item",
+                    variant: i.weightLabel || "Standard",
+                    quantity: i.quantity,
+                    price: i.price,
+                    total: i.price * i.quantity
+                })),
+                totalAmount: order.totalAmount,
+                discountAmount: order.discountAmount || 0,
+                couponCode: order.couponCode || null
+            }
+        });
+    } catch (error) {
+        console.error("Get POS Invoice Error:", error);
         res.status(500).json({ success: false, message: error.message });
     }
 };

@@ -22,6 +22,7 @@ import favoriteRoutes from "./routes/favoriteRoutes.js";
 import notificationRoutes from "./routes/notificationRoutes.js";
 import searchRoutes from "./routes/searchRoutes.js";
 import roleRoutes from "./routes/roleRoutes.js";
+import couponRoutes from "./routes/couponRoutes.js";
 
 const app = express()
 
@@ -85,6 +86,7 @@ app.use("/api/notifications", notificationRoutes);
 app.use("/api/app/favorites", favoriteRoutes);
 app.use("/api/app/search", searchRoutes);
 app.use("/api/roles", roleRoutes);
+app.use("/api/coupons", couponRoutes);
 
 // Basic test route
 app.get("/", (req, res) => {

@@ -65,6 +65,15 @@ const appUserSchema = new mongoose.Schema(
         },
         fcmToken: {
             type: String
+        },
+        addedByRetailer: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: 'User',
+            default: null
+        },
+        isManualCustomer: {
+            type: Boolean,
+            default: false
         }
     },
     { timestamps: true }
