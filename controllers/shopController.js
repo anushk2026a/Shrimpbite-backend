@@ -982,6 +982,61 @@ export const addRetailerCustomer = async (req, res) => {
 };
 
 /**
+ * PUT /api/retailer/customers/:customerId
+ * Updates an existing customer profile.
+ */
+export const updateRetailerCustomer = async (req, res) => {
+    try {
+        const { customerId } = req.params;
+        const { fullName, phoneNumber, email, address, city, state, pincode } = req.body;
+
+        const customer = await AppUser.findById(customerId);
+        if (!customer) {
+            return res.status(404).json({ success: false, message: "Customer not found" });
+        }
+
+        if (fullName) customer.fullName = fullName.trim();
+        if (email !== undefined) customer.email = email ? email.trim().toLowerCase() : "";
+        if (phoneNumber) {
+            let cleanPhone = phoneNumber.trim();
+            if (!cleanPhone.startsWith("+")) {
+                cleanPhone = cleanPhone.startsWith("91") ? `+${cleanPhone}` : `+91${cleanPhone.replace(/^0+/, "")}`;
+            }
+            customer.phoneNumber = cleanPhone;
+        }
+
+        if (address !== undefined || city !== undefined || pincode !== undefined) {
+            if (!customer.addresses || customer.addresses.length === 0) {
+                customer.addresses = [{
+                    label: "Home",
+                    fullAddress: address || "",
+                    city: city || "Bangalore",
+                    state: state || "Karnataka",
+                    pincode: pincode || "",
+                    isDefault: true
+                }];
+            } else {
+                customer.addresses[0].fullAddress = address !== undefined ? address : customer.addresses[0].fullAddress;
+                customer.addresses[0].city = city !== undefined ? city : customer.addresses[0].city;
+                customer.addresses[0].state = state !== undefined ? state : customer.addresses[0].state;
+                customer.addresses[0].pincode = pincode !== undefined ? pincode : customer.addresses[0].pincode;
+            }
+        }
+
+        await customer.save();
+
+        res.status(200).json({
+            success: true,
+            message: "Customer updated successfully",
+            data: customer
+        });
+    } catch (error) {
+        console.error("Update Retailer Customer Error:", error);
+        res.status(500).json({ success: false, message: error.message });
+    }
+};
+
+/**
  * POST /api/retailer/pos-order
  * Retailer creates an on-demand One-time or Subscription order directly for customer
  * Supports Paid vs Dues option & auto-assigns deliveryOtp

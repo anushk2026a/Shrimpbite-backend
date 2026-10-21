@@ -10,7 +10,7 @@ import {
     deleteProduct
 } from "../controllers/productController.js";
 import { updateRetailerProfile } from "../controllers/authController.js";
-import { toggleShopStatus, finalizeOrderWeight, getRetailerDashboardStats, getRetailerCustomers, addRetailerCustomer, createRetailerPosOrder, getRetailerPosInvoice, getRetailerRevenueStats, getRetailerOrders, getRetailerReviews, updateOrderItemStatus, assignRiderToOrder, getBankAccounts, addBankAccount, deleteBankAccount } from "../controllers/shopController.js";
+import { toggleShopStatus, finalizeOrderWeight, getRetailerDashboardStats, getRetailerCustomers, addRetailerCustomer, updateRetailerCustomer, createRetailerPosOrder, getRetailerPosInvoice, getRetailerRevenueStats, getRetailerOrders, getRetailerReviews, updateOrderItemStatus, assignRiderToOrder, getBankAccounts, addBankAccount, deleteBankAccount } from "../controllers/shopController.js";
 import { getDailyPrepList } from "../services/prepService.js";
 
 const router = express.Router();
@@ -29,6 +29,7 @@ router.get("/revenue-stats", protect, retailerOnly, getRetailerRevenueStats);
 // Customers
 router.get("/customers", protect, retailerOnly, getRetailerCustomers);
 router.post("/customers", protect, retailerOnly, addRetailerCustomer);
+router.put("/customers/:customerId", protect, retailerOnly, updateRetailerCustomer);
 router.post("/pos-order", protect, retailerOnly, createRetailerPosOrder);
 router.get("/pos-order/:orderId/invoice", protect, retailerOnly, getRetailerPosInvoice);
 
