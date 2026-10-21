@@ -87,6 +87,7 @@ app.use("/api/app/favorites", favoriteRoutes);
 app.use("/api/app/search", searchRoutes);
 app.use("/api/roles", roleRoutes);
 app.use("/api/coupons", couponRoutes);
+app.use("/api/app/coupons", couponRoutes);
 
 // Basic test route
 app.get("/", (req, res) => {
