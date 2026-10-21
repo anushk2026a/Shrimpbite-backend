@@ -484,11 +484,18 @@ export const getRetailerOrders = async (req, res) => {
 
         // Build query
         const query = { 
-            "items.retailer": retailerId,
-            status: { $ne: "Payment Pending" }
+            "items.retailer": retailerId
         };
         if (customerId) {
-            query.user = customerId;
+            // When querying a specific customer's history, include all orders (even if Payment Pending or Dues)
+            if (mongoose.Types.ObjectId.isValid(customerId)) {
+                query.user = new mongoose.Types.ObjectId(customerId);
+            } else {
+                query.user = customerId;
+            }
+        } else {
+            // General store dashboard excludes incomplete online checkout attempts
+            query.status = { $ne: "Payment Pending" };
         }
 
         // Fetch all orders containing items from this retailer and populate product, rider, and subscription info
@@ -1083,8 +1090,8 @@ export const createRetailerPosOrder = async (req, res) => {
                 const variant = product.variants.id(itm.variantId);
                 if (variant) {
                     price = variant.price;
-                    weightToReduce = variant.weightInKg * (Number(itm.quantity) || 1);
-                    weightLabel = variant.weight;
+                    weightToReduce = (variant.weightInKg || 0.5) * (Number(itm.quantity) || 1);
+                    weightLabel = variant.label || variant.weight || `${variant.weightValue || ''} ${variant.weightUnit || ''}`.trim() || `${weightToReduce} kg`;
                 }
             }
 
@@ -1183,7 +1190,12 @@ export const getRetailerPosInvoice = async (req, res) => {
         const { orderId } = req.params;
         const retailerId = req.userId || req.user._id;
 
-        const order = await Order.findOne({ orderId })
+        const order = await Order.findOne({
+            $or: [
+                { orderId },
+                ...(mongoose.Types.ObjectId.isValid(orderId) ? [{ _id: orderId }] : [])
+            ]
+        })
             .populate("items.product", "name sku")
             .populate("user", "fullName phoneNumber email addresses")
             .populate("items.retailer", "name businessDetails email phone");
