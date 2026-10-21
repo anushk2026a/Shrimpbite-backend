@@ -30,6 +30,7 @@ const app = express()
 const allowedOrigins = [
     "http://localhost:3000",
     "http://localhost:3001",
+    "http://localhost:3002",
     "https://retailer.shrimpbite.in",
     "http://127.0.0.1:3000",
     "https://shrimpbite-admin.vercel.app",
